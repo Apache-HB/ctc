@@ -1,0 +1,2 @@
+# null is strongly typed
+alias NullI8 = null<i8>;
