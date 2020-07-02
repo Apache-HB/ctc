@@ -48,7 +48,7 @@ varBody : ':' type | (':' type)? '=' expr ;
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt ;
+stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' ;
 
 returnStmt : 'return' expr? ';' ;
 
@@ -80,16 +80,16 @@ funcType : 'def' '(' funcTypeArgs? ')' funcTypeTail? ;
 funcTypeArgs : type (',' type)* ;
 funcTypeTail : '->' type ;
 
-expr 
-    : (IntLiteral | StringLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr | initExpr)* 
+expr
+    : (IntLiteral | StringLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr | initExpr)*
     | initExpr
     ;
 
 coerceExpr : 'coerce' '<' type '>' '(' expr ')' ;
 
 unaryOp : '+' | '-' | '!' | '~' | '&' | '*' ;
-binaryOp 
-    : '+' | '+=' 
+binaryOp
+    : '+' | '+='
     | '-' | '-='
     | '*' | '*='
     | '/' | '/='
