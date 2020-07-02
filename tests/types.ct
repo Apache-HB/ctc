@@ -1,2 +1,10 @@
-# null is strongly typed
-alias NullI8 = null<i8>;
+import std::sys;
+import std::sys(entry, EntryType);
+import std::traits(noreturn);
+
+@[noreturn, sys::entry(EntryType::CLI)]
+def cli_main {
+    var (argc, _) = sys::args();
+
+    sys::exit(argc);
+}
