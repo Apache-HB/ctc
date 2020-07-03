@@ -1,13 +1,17 @@
 # Terms
 
-## Platform defined behavior (PDB)
+## Platform Defined Behavior (PDB)
 
-Refers to behavior that is defined per target but has no guarantees to behave the same across multiple targets.
+Behavior that is defined but may vary between targets.
 
-## Implementation defined behavior (IDB)
+## Implementation Defined Behavior (IDB)
 
-Refers to behavior that is defined per compiler but has no guarantees to behave the same across multiple compilers even when targeting the same platform.
+Behavior that is defined on a per-compiler basis.
 
-## Undefined behavior (UB)
+## Undefined Behavior (UB)
 
-Refers to behavior that is not defined and may be interpreted by each compiler and platform differently. Any and all behavior is valid UB.
+Behavior that is undefined and has no guarantees. Compilers are not required to warn about UB.
+
+## Compilation Unit (CU)
+
+Each file compiled is a single compilation unit. Compilers are allowed to combine multiple files into single compilation units.

@@ -7,18 +7,14 @@ importDecl : 'import' importPath importSpec? ';' ;
 importPath : Ident ('::' Ident)* ;
 importSpec : '(' Ident (',' Ident)* ')' ;
 
-bodyDecl : decorator* (funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl | operatorDecl) ;
+bodyDecl : decorator* (funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl) ;
 
 decorator : '@' decoratorItem | '@' '[' decoratorItem (',' decoratorItem) ']' ;
 decoratorItem : decoratorName callExpr? ;
 decoratorName : Ident ('::' Ident)* ;
 
-objectField : decorator* (varDecl | aliasDecl | funcDecl | operatorDecl) ;
+objectField : decorator* (varDecl | aliasDecl | funcDecl) ;
 objectDecl : 'object' Ident '{' objectField* '}' ;
-
-operatorOp : unaryOp | binaryOp | '(' ')' | '[' ']' ;
-
-operatorDecl : 'operator' operatorOp funcArgs? funcTail? funcBody ;
 
 structField : Ident ':' type ';' ;
 structDecl : 'struct' Ident '{' structField* '}' ;
