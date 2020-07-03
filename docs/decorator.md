@@ -52,6 +52,7 @@ def add(a: i32, b: i32) = a + b;
 
 ```ct
 import std::builtin(perms);
+import std::builtin::perms(write, exec);
 
 # coercing this data to a function and calling it is now PDB instead of invalid
 @perms(write | exec)
@@ -65,3 +66,7 @@ def func {
 ```
 
 perms cannot be applied to functions that are marked with the `compile` decorator.
+
+### Callconv
+
+`std::arch::callconv` allows the user to override the default calling convention of a function to use a specific one. This is useful for interop with other languages such as C.
