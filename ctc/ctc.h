@@ -52,7 +52,7 @@ typedef enum {
     TK_INVALID
 } CtTokenKind;
 
-typedef unsigned long long CtDigit;
+typedef unsigned long CtDigit;
 
 typedef enum {
 #define OP(id, str) id,

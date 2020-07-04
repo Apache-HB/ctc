@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <errno.h>
 
 static char* cstrdup(const char* str)
 {
@@ -103,7 +104,7 @@ static CtLexer* lexOpen(CtStream* stream)
 }
 
 typedef struct {
-    CtLexer stream;
+    CtLexer* stream;
     CtToken tok;
 } CtParser;
 
@@ -237,14 +238,113 @@ static char* lexString(CtLexer* self)
     return lexSingleString(self);
 }
 
-static CtDigit lexDigit0(CtLexer* self)
-{
-    return 0;
-}
-
 static CtDigit lexDigit(CtLexer* self, int c)
 {
-    return 0;
+    bufReset(self, (char)c);
+
+    while (1)
+    {
+        c = streamPeek(self);
+
+        if (isdigit(c))
+        {
+            bufPush(self, (char)streamNext(self->stream));
+        }
+        else if (c == '_')
+        {
+            streamNext(self->stream);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return strtoul(self->buffer, NULL, 10);
+}
+
+static CtDigit lexBinDigit(CtLexer* self)
+{
+    int c = streamPeek(self->stream);
+
+    if (c != '0' && c != '1' && c != '_')
+    {
+        /* error */
+    }
+
+    bufReset(self, (char)c);
+
+    while (1)
+    {
+        if (c == '0' || c == '1')
+        {
+            bufPush(self, (char)streamNext(self->stream));
+        }
+        else if (c == '_')
+        {
+            streamNext(self->stream);
+        }
+        else
+        {
+            break;
+        }
+
+        c = streamPeek(self->stream);
+    }
+
+    return strtoul(self->buffer, NULL, 2);
+}
+
+static CtDigit lexHexDigit(CtLexer* self)
+{
+    int c = streamPeek(self->stream);
+
+    if (!isxdigit(c) && c != '_')
+    {
+        /* error */
+    }
+
+    bufReset(self, (char)c);
+
+    while (1)
+    {
+        if (isxdigit(c))
+        {
+            bufPush(self, (char)streamNext(self->stream));
+        }
+        else if (c == '_')
+        {
+            streamNext(self->stream);
+        }
+        else
+        {
+            break;
+        }
+
+        c = streamPeek(self->stream);
+    }
+
+
+    return strtoul(self->buffer, NULL, 16);
+}
+
+static CtDigit lexDigit0(CtLexer* self)
+{
+    if (streamConsume(self->stream, 'b'))
+    {
+        /* binary digit */
+        return lexBinDigit(self);
+    }
+    else if (streamConsume(self, 'x'))
+    {
+        /* hex digit */
+        return lexHexDigit(self);
+    }
+    else
+    {
+        /* normal digit */
+        return lexDigit(self, '0');
+    }
 }
 
 static char lexSingleChar(CtLexer* self, int linebreak)
@@ -403,11 +503,21 @@ static CtToken lexNext(CtLexer* self)
     {
         /* special path for hex and binary numbers */
         tok.data.digit = lexDigit0(self);
+
+        if (errno == ERANGE)
+        {
+            /* number too big */
+        }
     }
     else if (isdigit(c))
     {
         /* is a number */
         tok.data.digit = lexDigit(self, c);
+
+        if (errno == ERANGE)
+        {
+            /* number too big */
+        }
     }
     else
     {
@@ -418,7 +528,64 @@ static CtToken lexNext(CtLexer* self)
     return tok;
 }
 
+static CtParser* parseOpen(CtLexer* lex)
+{
+    CtParser* self = malloc(sizeof(CtParser));
+
+    self->stream = lex;
+    self->tok.kind = TK_INVALID;
+
+    return self;
+}
+
+static CtToken parseNext(CtParser* self)
+{
+    CtToken tok = self->tok;
+    self->tok.kind = TK_INVALID;
+
+    if (tok.kind == TK_INVALID)
+    {
+        tok = lexNext(self->stream);
+    }
+
+    return tok;
+}
+
+static int parseConsume(CtParser* self, CtTokenKind kind)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == kind)
+    {
+        return 1;
+    }
+
+    /* failed to consume token so put it back into our lookahead */
+    self->tok = tok;
+    return 0;
+}
+
+static int parseConsumeKey(CtParser* self, CtKeyword key)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_KEYWORD && tok.data.key == key)
+    {
+        return 1;
+    }
+
+    /* failed to consume token so put it back into our lookahead */
+    self->tok = tok;
+    return 0;
+}
+
 CtAST* ctParse(CtStream* stream)
 {
+    CtLexer* lex;
+    CtParser* parse;
+
+    lex = lexOpen(stream);
+    parse = parseOpen(lex);
+
     return NULL;
 }
