@@ -44,7 +44,6 @@ typedef enum {
     TK_IDENT,
     TK_STRING,
     TK_INT,
-    TK_CHAR,
     TK_KEYWORD,
     TK_EOF,
 
@@ -53,6 +52,7 @@ typedef enum {
 } CtTokenKind;
 
 typedef unsigned long CtDigit;
+typedef unsigned long CtChar;
 
 typedef enum {
 #define OP(id, str) id,
@@ -69,9 +69,6 @@ typedef union {
 
     /* TK_STRING */
     char* string;
-
-    /* TK_CHAR */
-    CtDigit letter;
 
     /* TK_INT */
     CtDigit digit;
