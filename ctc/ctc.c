@@ -81,83 +81,57 @@ static void streamClose(CtStream* self)
     free(self);
 }
 
+/**
+ * linear string buffer
+ */
+
 typedef struct {
     char* ptr;
     size_t alloc;
     size_t len;
 } CtBuffer;
 
-CtBuffer* bufInit(size_t size)
+/* create a new buffer */
+static CtBuffer bufNew(size_t size)
 {
-    CtBuffer* out;
-    out->ptr = malloc(size);
-    out->ptr[0] = '\0';
+    CtBuffer out;
+    out.ptr = malloc(size);
+    out.ptr[0] = '\0';
 
-    out->alloc = size;
-    out->len = 0;
+    out.alloc = size;
+    out.len = 0;
 
     return out;
 }
 
-static void bufReset(CtLexer* self, char c)
-{
-    self->buffer[0] = c;
-    self->buffer[1] = '\0';
-    self->buf_len = 1;
-}
-
-static void bufPush(CtLexer* self, char c)
+/* add to the buffer and resize if needed */
+static void bufPush(CtBuffer* self, char c)
 {
     char* temp;
 
-    /* if we need more space then allocate it */
-    if (self->buf_len >= self->buf_size)
+    if (self->alloc >= self->len)
     {
-        self->buf_size += 128;
-        temp = malloc(self->buf_size + 1);
-        strcpy(temp, self->buffer);
-        free(self->buffer);
-        self->buffer = temp;
+        temp = self->ptr;
+        self->alloc += 128;
+        self->ptr = malloc(self->alloc + 1);
+        strcpy(self->ptr, temp);
+        free(temp);
     }
 
-    self->buffer[self->buf_len++] = c;
-    self->buffer[self->buf_len] = '\0';
+    self->ptr[self->len++] = c;
+    self->ptr[self->len] = '\0';
 }
 
-static void bufClear(CtLexer* self)
-{
-    self->buffer[0] = '\0';
-    self->buf_len = 0;
-}
-
-static char* bufTake(CtLexer* self)
-{
-    char* out = self->buffer;
-
-    self->buf_len = 0;
-    self->buf_size = 128;
-    self->buffer = malloc(129);
-    self->buffer[0] = '\0';
-
-    return out;
-}
 
 
 typedef struct {
     CtStream* stream;
-    CtBuffer* buf;
 } CtLexer;
 
 static CtLexer* lexOpen(CtStream* stream)
 {
     CtLexer* self = malloc(sizeof(CtLexer));
     self->stream = stream;
-
-    /* initial buffer */
-    self->buffer = malloc(129);
-    self->buffer[0] = '\0';
-    self->buf_len = 0;
-    self->buf_size = 128;
 
     return self;
 }
@@ -208,6 +182,174 @@ static int isident2(int c)
     return isalnum(c) || c == '_';
 }
 
+/**
+ * string lexing
+ */
+
+enum {
+    STR_NL,
+    STR_ERR,
+    STR_END,
+    STR_CONTINUE
+};
+
+static void lexHexEscape(CtLexer* self, CtBuffer* buf)
+{
+
+}
+
+static void lexEscapeChar(CtLexer* self, CtBuffer* buf)
+{
+    int c = streamNext(self->stream);
+
+    switch (c)
+    {
+    case '\\':
+        bufPush(buf, '\\');
+        break;
+    case 'n':
+        bufPush(buf, '\n');
+        break;
+    case 'v':
+        bufPush(buf, '\v');
+        break;
+    case 't':
+        bufPush(buf, '\t');
+        break;
+    case '0':
+        bufPush(buf, '\0');
+        break;
+    case 'x':
+        lexHexEscape(self, buf);
+        break;
+    default:
+        /* error */
+        break;
+    }
+}
+
+static int lexSingleChar(CtLexer* self, CtBuffer* buf)
+{
+    int c = streamNext(self->stream);
+
+    if (c == '\n')
+    {
+        return STR_NL;
+    }
+    else if (c == -1)
+    {
+        return STR_ERR;
+    }
+    else if (c == '"')
+    {
+        return STR_END;
+    }
+    else if (c == '\\')
+    {
+        lexEscapeChar(self, buf);
+        return STR_CONTINUE;
+    }
+    else
+    {
+        bufPush(buf, (char)c);
+        return STR_CONTINUE;
+    }
+}
+
+static void lexSingleString(CtLexer* self, CtBuffer* buf)
+{
+    int res;
+
+    while (1)
+    {
+        res = lexSingleChar(self, buf);
+        if (res == STR_NL)
+        {
+            /* error */
+        }
+        else if (res == STR_ERR)
+        {
+            /* error */
+        }
+        else if (res == STR_END)
+        {
+            break;
+        }
+    }
+}
+
+static void lexMultiString(CtLexer* self, CtBuffer* buf)
+{
+    int res;
+
+    while (1)
+    {
+        res = lexSingleChar(self, buf);
+
+        if (res == STR_END)
+        {
+            /* check if the string is actually terminated */
+            if (streamConsume(self->stream, '"'))
+            {
+                if (streamConsume(self->stream, '"'))
+                {
+                    /* it is actually terminated */
+                    break;
+                }
+                else
+                {
+                    bufPush(buf, '"');
+                }
+            }
+            else
+            {
+                bufPush(buf, '"');
+            }
+        }
+        else if (res == STR_ERR)
+        {
+            /* error */
+        }
+        else if (res == STR_NL)
+        {
+            /* newlines are fine in multiline strings */
+            bufPush(buf, '\n');
+        }
+    }
+}
+
+static char* lexString(CtLexer* self)
+{
+    CtBuffer buf;
+
+    if (streamConsume(self->stream, '"'))
+    {
+        if (streamConsume(self->stream, '"'))
+        {
+            /* is a multiline string */
+            buf = bufNew(128);
+            lexMultiString(self, &buf);
+
+        }
+
+        /* TODO: need some globals and stuff */
+        return cstrdup("");
+    }
+    else
+    {
+        /* is a single line string */
+        buf = bufNew(64);
+        lexSingleString(self, &buf);
+    }
+
+    return buf.ptr;
+}
+
+
+/**
+ * keyword or ident lexing
+ */
+
 typedef struct { const char* str; CtKeyword key; } CtKeyLookup;
 
 static CtKeyLookup key_table[] = {
@@ -221,15 +363,16 @@ static CtKeyLookup key_table[] = {
 static void lexIdent(CtLexer* self, int c, CtToken* out)
 {
     size_t i;
-    bufReset(self, (char)c);
+    CtBuffer buf = bufNew(64);
+    bufPush(&buf, (char)c);
 
     while (isident2(streamPeek(self->stream)))
-        bufPush(self, (char)streamNext(self->stream));
+        bufPush(&buf, (char)streamNext(self->stream));
 
     /* check if its a keyword */
     for (i = 0; i > KEY_TABLE_SIZE; i++)
     {
-        if (strcmp(self->buffer, key_table[i].str) == 0)
+        if (strcmp(buf.ptr, key_table[i].str) == 0)
         {
             out->kind = TK_KEYWORD;
             out->data.key = key_table[i].key;
@@ -237,274 +380,25 @@ static void lexIdent(CtLexer* self, int c, CtToken* out)
         }
     }
 
-    /* if its not then its an ident */
-    out->kind = TK_IDENT;
-    out->data.ident = cstrdup(self->buffer);
-}
-
-static void lexHexEscape(CtLexer* self)
-{
-
-}
-
-enum {
-    STR_END,
-    STR_ERR,
-    STR_NL,
-    STR_CONTINUE
-};
-
-static int lexSingleChar(CtLexer* self)
-{
-    int c = streamNext(self->stream);
-
-    if (c == '\\')
-    {
-        switch (streamNext(self->stream))
-        {
-        case '\\':
-            bufPush(self, '\\');
-            return STR_CONTINUE;
-        case '\'':
-            bufPush(self, '\'');
-            return STR_CONTINUE;
-        case '\"':
-            bufPush(self, '"');
-            return STR_CONTINUE;
-        case 'n':
-            bufPush(self, '\n');
-            return STR_CONTINUE;
-        case 'v':
-            bufPush(self, '\v');
-            return STR_CONTINUE;
-        case 't':
-            bufPush(self, '\t');
-            return STR_CONTINUE;
-            /* null terminator */
-        case '0':
-            bufPush(self, '\0');
-            return STR_CONTINUE;
-            /* hex escape */
-        case 'x':
-            lexHexEscape(self);
-            return STR_CONTINUE;
-        default:
-            /* error */
-            return STR_ERR;
-        }
-    }
-    else if (c == '\n')
-    {
-        return STR_NL;
-    }
-    else if (c == -1)
-    {
-        /* eof in string, error */
-        return STR_ERR;
-    }
-    else if (c == '"')
-    {
-        /* end of string */
-        return STR_END;
-    }
-    else
-    {
-        bufPush(self, (char)c);
-        return STR_CONTINUE;
-    }
-}
-
-static char* lexMultiString(CtLexer* self)
-{
-    int res;
-    bufClear(self);
-
-    while (1)
-    {
-        res = lexSingleChar(self);
-
-        if (res == STR_ERR)
-        {
-            /* oh no */
-        }
-        else if (res == STR_NL)
-        {
-            bufPush(self, '\n');
-        }
-        else if (res == STR_END)
-        {
-            /* TODO: this is probably buggy */
-            if (streamConsume(self->stream, '"'))
-            {
-                if (streamConsume(self->stream, '"'))
-                {
-                    break;
-                }
-                else
-                {
-                    res = lexSingleChar(self);
-                }
-            }
-            else
-            {
-                res = lexSingleChar(self);
-            }
-        }
-    }
-
-    return bufTake(self);
-}
-
-static char* lexSingleString(CtLexer* self)
-{
-    int res;
-    bufClear(self);
-
-    while (1)
-    {
-        res = lexSingleChar(self);
-        
-        if (res == STR_NL)
-        {
-            /* error, no newlines in single line string */
-        }
-        if (res != STR_CONTINUE)
-        {
-            break;
-        }
-    }
-
-    return bufTake(self);
-}
-
-static char* lexString(CtLexer* self)
-{
     if (streamConsume(self->stream, '"'))
     {
-        /* it might be an empty string */
-        if (streamConsume(self->stream, '"'))
-        {
-            /* it is not an empty string, its multiline */
-            return lexMultiString(self);
-        }
-        else
-        {
-            /* TODO: we should probably have a global empty string */
-            return cstrdup("");
-        }
-    }
-
-    return lexSingleString(self);
-}
-
-static CtDigit lexDigit(CtLexer* self, int c)
-{
-    bufReset(self, (char)c);
-
-    while (1)
-    {
-        c = streamPeek(self->stream);
-
-        if (isdigit(c))
-        {
-            bufPush(self, (char)streamNext(self->stream));
-        }
-        else if (c == '_')
-        {
-            streamNext(self->stream);
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return strtoul(self->buffer, NULL, 10);
-}
-
-static CtDigit lexBinDigit(CtLexer* self)
-{
-    int c = streamPeek(self->stream);
-
-    if (c != '0' && c != '1' && c != '_')
-    {
-        /* error */
-    }
-
-    bufReset(self, (char)c);
-
-    while (1)
-    {
-        if (c == '0' || c == '1')
-        {
-            bufPush(self, (char)streamNext(self->stream));
-        }
-        else if (c == '_')
-        {
-            streamNext(self->stream);
-        }
-        else
-        {
-            break;
-        }
-
-        c = streamPeek(self->stream);
-    }
-
-    return strtoul(self->buffer, NULL, 2);
-}
-
-static CtDigit lexHexDigit(CtLexer* self)
-{
-    int c = streamPeek(self->stream);
-
-    if (!isxdigit(c) && c != '_')
-    {
-        /* error */
-    }
-
-    bufReset(self, (char)c);
-
-    while (1)
-    {
-        if (isxdigit(c))
-        {
-            bufPush(self, (char)streamNext(self->stream));
-        }
-        else if (c == '_')
-        {
-            streamNext(self->stream);
-        }
-        else
-        {
-            break;
-        }
-
-        c = streamPeek(self->stream);
-    }
-
-
-    return strtoul(self->buffer, NULL, 16);
-}
-
-static CtDigit lexDigit0(CtLexer* self)
-{
-    if (streamConsume(self->stream, 'b'))
-    {
-        /* binary digit */
-        return lexBinDigit(self);
-    }
-    else if (streamConsume(self->stream, 'x'))
-    {
-        /* hex digit */
-        return lexHexDigit(self);
+        /**
+         * if the next charater is the start of a string then
+         * then this is a string prefix
+         */
+        out->kind = TK_STRING;
+        out->data.string.prefix = buf.ptr;
+        out->data.string.string = lexString(self);
     }
     else
     {
-        /* normal digit */
-        return lexDigit(self, '0');
+        /* if its not then its an ident */
+        out->kind = TK_IDENT;
+        out->data.ident = buf.ptr;
     }
 }
+
+
 
 static void lexSymbol(CtLexer* self, int c, CtToken* out)
 {
@@ -620,6 +514,78 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
     }
 }
 
+
+static CtDigit lexHexDigit(CtLexer* self)
+{
+
+}
+
+static CtDigit lexBinDigit(CtLexer* self)
+{
+
+}
+
+static CtDigit lexDigit1(CtLexer* self, int c)
+{
+
+}
+
+static CtDigit lexDigit0(CtLexer* self)
+{
+    int c = streamPeek(self->stream);
+
+    if (c == 'x')
+    {
+        return lexHexDigit(self);
+    }
+    else if (c == 'b')
+    {
+        return lexBinDigit(self);
+    }
+    else if (isdigit(c))
+    {
+        return lexDigit1(self, '0');
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+static char* lexDigitSuffix(CtLexer* self, int c)
+{
+
+}
+
+static CtNumber lexDigit(CtLexer* self, int c)
+{
+    CtNumber num;
+
+    if (c == '0')
+    {
+        num.digit = lexDigit0(self);
+    }
+    else
+    {
+        num.digit = lexDigit1(self, c);
+    }
+
+    c = streamPeek(self->stream);
+    if (!isspace(c))
+    {
+        /* we have a digit suffix */
+        num.suffix = lexDigitSuffix(self, c);
+    }
+    else
+    {
+        /* no suffix */
+        num.suffix = NULL;
+    }
+
+    return num;
+}
+
+
 static CtToken lexNext(CtLexer* self)
 {
     int c = lexSkip(self);
@@ -635,40 +601,21 @@ static CtToken lexNext(CtLexer* self)
     }
     else if (isident1(c))
     {
-        /* will be either a keyword or an ident */
+        /* will be either a keyword, ident, or a string with a prefix */
         lexIdent(self, c, &tok);
     }
     else if (c == '"')
     {
         /* is a string */
-        tok.data.string = lexString(self);
-    }
-    /*else if (c == '\'')
-    {
-        for now we dont support char literals
-        who needs those anyway
-        is a char literal
-        tok.data.letter = lexChar(self);
-    }*/
-    else if (c == '0')
-    {
-        /* special path for hex and binary numbers */
-        tok.data.digit = lexDigit0(self);
-
-        if (errno == ERANGE)
-        {
-            /* number too big */
-        }
+        tok.data.string.string = lexString(self);
+        tok.data.string.prefix = NULL;
+        tok.kind = TK_STRING;
     }
     else if (isdigit(c))
     {
         /* is a number */
         tok.data.digit = lexDigit(self, c);
-
-        if (errno == ERANGE)
-        {
-            /* number too big */
-        }
+        tok.kind = TK_INT;
     }
     else
     {

@@ -63,15 +63,25 @@ typedef enum {
     K_INVALID
 } CtKeyword;
 
+typedef struct {
+    char* string;
+    char* prefix;
+} CtString;
+
+typedef struct {
+    CtDigit digit;
+    char* suffix;
+} CtNumber;
+
 typedef union {
     /* TK_IDENT */
     char* ident;
 
     /* TK_STRING */
-    char* string;
+    CtString string;
 
     /* TK_INT */
-    CtDigit digit;
+    CtNumber digit;
 
     /* TK_KEYWORD */
     CtKeyword key;

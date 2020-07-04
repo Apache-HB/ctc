@@ -118,8 +118,8 @@ namedInitArg : '[' expr ']' '=' expr ;
 accessExpr : '.' Ident ;
 derefExpr : '->' Ident ;
 
-IntLiteral : Base10 | Base2 | Base16 ;
-StringLiteral : SingleString | MultiString ;
+IntLiteral : (Base10 | Base2 | Base16) Ident? ;
+StringLiteral : Ident? (SingleString | MultiString) ;
 CharLiteral : '\'' Letter '\'' ;
 
 Ident : [a-zA-Z_][a-zA-Z0-9_]* ;
