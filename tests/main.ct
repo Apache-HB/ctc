@@ -1,0 +1,7 @@
+import std::sys;
+import std::traits(noreturn);
+
+@[noreturn, sys::entry(:CLI)]
+def cli_main {
+    sys::exit(0);
+}

@@ -14,14 +14,18 @@ typedef struct {
     int col;
 } CtStreamPos;
 
-typedef struct CtStream {
-    /**
-     * function pointers for opening, closing, 
-     * and reading the next character from a stream
-     */
+typedef struct {
     void*(*open)(const char*);
     void(*close)(void*);
     int(*next)(void*);
+} CtStreamCallbacks;
+
+typedef struct CtStream {
+    /**
+     * function pointers for opening, closing,
+     * and reading the next character from a stream
+     */
+    CtStreamCallbacks callbacks;
 
     /* file stream data */
     void* data;
@@ -40,6 +44,7 @@ typedef enum {
     TK_IDENT,
     TK_STRING,
     TK_INT,
+    TK_CHAR,
     TK_KEYWORD,
     TK_EOF,
 
@@ -65,13 +70,19 @@ typedef union {
     /* TK_STRING */
     char* string;
 
+    /* TK_CHAR */
+    CtDigit letter;
+
     /* TK_INT */
     CtDigit digit;
 
     /* TK_KEYWORD */
     CtKeyword key;
 
-    /* TK_EOF, TK_INVALID */
+    /* TK_INVALID */
+    char* reason;
+
+    /* TK_EOF */
 } CtTokenData;
 
 typedef struct {
@@ -80,19 +91,21 @@ typedef struct {
     CtStreamPos pos;
 } CtToken;
 
-typedef struct {
-    CtStream stream;
-} CtLexer;
+typedef enum {
+    AT_UNIT
+} CtASTType;
 
-typedef struct {
-    CtLexer stream;
+typedef union {
+    struct CtAST* thing;
+} CtASTData;
+
+typedef struct CtAST {
+    CtASTType type;
     CtToken tok;
-} CtParser;
-
-typedef struct {
-
+    CtASTData data;
 } CtAST;
 
+CtStream* ctOpen(CtStreamCallbacks callbacks, const char* path);
 CtAST* ctParse(CtStream* stream);
 
 #endif /* CTC_H */

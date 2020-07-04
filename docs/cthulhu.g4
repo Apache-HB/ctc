@@ -50,8 +50,7 @@ returnStmt : 'return' expr? ';' ;
 
 forStmt : 'for' (forRange | forLoop) stmt ;
 forRange : varNames ':' expr ;
-forLoop : '(' varDecl? ';' expr? ';' expr? ')' ;
-
+forLoop : varDecl? ';' expr? ';' expr? ';' ;
 
 whileStmt : 'while' expr stmt ;
 
@@ -77,7 +76,7 @@ funcTypeArgs : type (',' type)* ;
 funcTypeTail : '->' type ;
 
 expr
-    : (IntLiteral | StringLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr | initExpr)*
+    : '@'? (IntLiteral | StringLiteral | CharLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr initExpr? | initExpr)*
     | initExpr
     ;
 
@@ -121,6 +120,7 @@ derefExpr : '->' Ident ;
 
 IntLiteral : Base10 | Base2 | Base16 ;
 StringLiteral : SingleString | MultiString ;
+CharLiteral : '\'' Letter '\'' ;
 
 Ident : [a-zA-Z_][a-zA-Z0-9_]* ;
 
