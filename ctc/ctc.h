@@ -100,21 +100,29 @@ typedef struct {
     CtStreamPos pos;
 } CtToken;
 
-typedef enum {
-    AT_UNIT
-} CtASTType;
+CtStream* ctOpen(CtStreamCallbacks callbacks, const char* path);
 
-typedef union {
-    struct CtAST* thing;
-} CtASTData;
+typedef struct {
+    CtStream* stream;
+} CtLexer;
 
-typedef struct CtAST {
-    CtASTType type;
+CtLexer* lexOpen(CtStream* stream);
+
+typedef struct {
+    CtLexer* source;
     CtToken tok;
-    CtASTData data;
+} CtParser;
+
+CtParser* parseOpen(CtLexer* source);
+
+typedef struct {
+    CtToken source;
 } CtAST;
 
-CtStream* ctOpen(CtStreamCallbacks callbacks, const char* path);
-CtAST* ctParse(CtStream* stream);
+/* parse a full compilation unit */
+CtAST* parseUnit(CtParser* parser);
+
+/* parse a single item in a stream, for repl stuff */
+CtAST* parseItem(CtParser* parser);
 
 #endif /* CTC_H */

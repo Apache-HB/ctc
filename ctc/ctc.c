@@ -117,24 +117,13 @@ static void bufPush(CtBuffer* self, char c)
     self->ptr[self->len] = '\0';
 }
 
-
-
-typedef struct {
-    CtStream* stream;
-} CtLexer;
-
-static CtLexer* lexOpen(CtStream* stream)
+CtLexer* lexOpen(CtStream* stream)
 {
     CtLexer* self = malloc(sizeof(CtLexer));
     self->stream = stream;
 
     return self;
 }
-
-typedef struct {
-    CtLexer* stream;
-    CtToken tok;
-} CtParser;
 
 /* skip whitespace and comments */
 static int lexSkip(CtLexer* self)
@@ -701,57 +690,6 @@ static CtToken lexNext(CtLexer* self)
     return tok;
 }
 
-static CtParser* parseOpen(CtLexer* lex)
-{
-    CtParser* self = malloc(sizeof(CtParser));
-
-    self->stream = lex;
-    self->tok.kind = TK_INVALID;
-
-    return self;
-}
-
-static CtToken parseNext(CtParser* self)
-{
-    CtToken tok = self->tok;
-    self->tok.kind = TK_INVALID;
-
-    if (tok.kind == TK_INVALID)
-    {
-        tok = lexNext(self->stream);
-    }
-
-    return tok;
-}
-
-static int parseConsume(CtParser* self, CtTokenKind kind)
-{
-    CtToken tok = parseNext(self);
-
-    if (tok.kind == kind)
-    {
-        return 1;
-    }
-
-    /* failed to consume token so put it back into our lookahead */
-    self->tok = tok;
-    return 0;
-}
-
-static int parseConsumeKey(CtParser* self, CtKeyword key)
-{
-    CtToken tok = parseNext(self);
-
-    if (tok.kind == TK_KEYWORD && tok.data.key == key)
-    {
-        return 1;
-    }
-
-    /* failed to consume token so put it back into our lookahead */
-    self->tok = tok;
-    return 0;
-}
-
 static const char* keyStr(CtKeyword key)
 {
 #define OP(id, str) case id: return str;
@@ -790,56 +728,3 @@ static void tokPrint(CtToken* tok)
     }
 }
 
-static CtAST* astNew(CtASTType type)
-{
-    CtAST* ast = malloc(sizeof(CtAST));
-    ast->type = type;
-
-    return ast;
-}
-
-static CtAST* parseUnitDecl(CtParser* self)
-{
-    CtAST* unit = astNew(AT_UNIT);
-
-    while (parseConsumeKey(self, K_IMPORT))
-    {
-
-    }
-
-    while (1)
-    {
-        if (parseConsumeKey(self, K_DEF))
-        {
-
-        }
-        else if (parseConsumeKey(self, K_AT))
-        {
-
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    return unit;
-}
-
-CtAST* ctParse(CtStream* stream)
-{
-    CtLexer* lex;
-    CtParser* parse;
-    CtAST* ast;
-
-    (void)tokPrint;
-    (void)parseConsume;
-    (void)parseConsumeKey;
-
-    lex = lexOpen(stream);
-    parse = parseOpen(lex);
-
-    ast = parseUnitDecl(parse);
-
-    return ast;
-}
