@@ -1,5 +1,5 @@
 import std::sys;
-import std::traits(noreturn);
+import std::traits(noreturn, honk);
 
 @[noreturn, sys::entry(:CLI)]
 def cli_main {

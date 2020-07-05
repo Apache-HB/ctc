@@ -117,7 +117,7 @@ static void bufPush(CtBuffer* self, char c)
     self->ptr[self->len] = '\0';
 }
 
-CtLexer* lexOpen(CtStream* stream)
+CtLexer* ctLexOpen(CtStream* stream)
 {
     CtLexer* self = malloc(sizeof(CtLexer));
     self->stream = stream;
@@ -401,7 +401,10 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
         out->data.key = streamConsume(self->stream, '=') ? K_ADDEQ : K_ADD;
         break;
     case '-':
-        out->data.key = streamConsume(self->stream, '=') ? K_SUBEQ : K_SUB;
+        if (streamConsume(self->stream, '>'))
+            out->data.key = K_ARROW;
+        else
+            out->data.key = streamConsume(self->stream, '=') ? K_SUBEQ : K_SUB;
         break;
     case '*':
         out->data.key = streamConsume(self->stream, '=') ? K_MULEQ : K_MUL;
@@ -728,3 +731,447 @@ static void tokPrint(CtToken* tok)
     }
 }
 
+static CtASTList* astListNew(CtAST* item)
+{
+    CtASTList* self = malloc(sizeof(CtASTList));
+
+    self->item = item;
+    self->next = NULL;
+
+    return self;
+}
+
+static CtASTList* astListAdd(CtASTList* self, CtAST* item)
+{
+    CtASTList* next;
+    if (self->item == NULL)
+    {
+        self->item = item;
+        next = self;
+    }
+    else
+    {
+        next = astListNew(item);
+        self->next = next;
+    }
+
+    return next;
+}
+
+CtParser* ctParseOpen(CtLexer* source)
+{
+    CtParser* self = malloc(sizeof(CtParser));
+    self->source = source;
+    self->tok.kind = TK_INVALID;
+    self->attribs = astListNew(NULL);
+    self->tail = self->attribs;
+
+    /* TODO */
+    (void)tokPrint;
+
+    return self;
+}
+
+static CtAST* astNew(CtASTKind kind)
+{
+    CtAST* self = malloc(sizeof(CtAST));
+
+    self->kind = kind;
+
+    return self;
+}
+
+static CtToken parseNext(CtParser* self)
+{
+    CtToken tok = self->tok;
+
+    if (tok.kind == TK_INVALID)
+    {
+        tok = lexNext(self->source);
+    }
+
+    self->tok.kind = TK_INVALID;
+    return tok;
+}
+
+static int parseConsumeKey(CtParser* self, CtKeyword key)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_KEYWORD && tok.data.key == key)
+    {
+        return 1;
+    }
+
+    self->tok = tok;
+    return 0;
+}
+
+static void parseExpectKey(CtParser* self, CtKeyword key)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != key)
+    {
+        printf("oh no 2\n");
+        /* error */
+    }
+}
+
+static CtAST* parseExpectIdent(CtParser* self)
+{
+    CtAST* out = astNew(AK_IDENT);
+    CtToken tok = parseNext(self);
+
+    if (tok.kind != TK_IDENT)
+    {
+        printf("oh no\n");
+        /* error */
+    }
+
+    out->tok = tok;
+
+    return out;
+}
+
+static CtASTList* parseItems(CtParser* self, CtKeyword sep)
+{
+    CtASTList* items = astListNew(parseExpectIdent(self));
+    CtASTList* tail = items;
+
+    while (parseConsumeKey(self, sep))
+    {
+        tail = astListAdd(tail, parseExpectIdent(self));
+    }
+
+    return items;
+}
+
+static CtAST* parseImport(CtParser* self)
+{
+    CtASTList* path;
+    CtASTList* items;
+    CtAST* dep;
+
+    path = parseItems(self, K_COLON2);
+
+    if (parseConsumeKey(self, K_LPAREN))
+    {
+        items = parseItems(self, K_COMMA);
+        parseExpectKey(self, K_RPAREN);
+    }
+    else
+    {
+        items = NULL;
+    }
+
+    dep = astNew(AK_IMPORT);
+    dep->data.import.path = path;
+    dep->data.import.items = items;
+
+    return dep;
+}
+
+static CtASTList* parseImports(CtParser* self)
+{
+    CtASTList* imports = astListNew(NULL);
+
+    while (parseConsumeKey(self, K_IMPORT))
+    {
+        astListAdd(imports, parseImport(self));
+        parseExpectKey(self, K_SEMI);
+    }
+
+    return imports;
+}
+
+static CtASTList* takeAttribs(CtParser* self)
+{
+    CtASTList* out = self->attribs;
+
+    self->attribs = astListNew(NULL);
+    self->tail = self->attribs;
+
+    return out;
+}
+
+static void parseAttrib(CtParser* self)
+{
+    CtASTList* path;
+    CtAST* attrib;
+
+    path = parseItems(self, K_COLON2);
+
+    attrib = astNew(AK_ATTRIB);
+    attrib->data.attrib.path = path;
+
+    self->tail = astListAdd(self->tail, attrib);
+}
+
+static void parseAttribs(CtParser* self)
+{
+    if (parseConsumeKey(self, K_LSQUARE))
+    {
+        do { parseAttrib(self); } while (parseConsumeKey(self, K_COMMA));
+        parseExpectKey(self, K_RSQUARE);
+    }
+    else
+    {
+        parseAttrib(self);
+    }
+}
+
+static CtAST* parseType(CtParser* self);
+
+static CtAST* parsePointerType(CtParser* self)
+{
+    CtAST* type;
+    CtAST* body;
+
+    body = parseType(self);
+
+    type = astNew(AK_PTRTYPE);
+    type->data.ptr.type = body;
+
+    return type;
+}
+
+static CtAST* parseArrayType(CtParser* self)
+{
+    CtAST* type;
+    CtAST* body;
+    CtAST* size;
+
+    body = parseType(self);
+
+    parseExpectKey(self, K_COLON);
+
+    if (parseConsumeKey(self, K_VAR))
+    {
+        size = NULL;
+    }
+    else
+    {
+        size = parseExpr(self);
+    }
+
+    type = astNew(AK_ARRTYPE);
+    type->data.arr.type = body;
+    type->data.arr.size = size;
+
+    return type;
+}
+
+static CtAST* parseFuncType(CtParser* self)
+{
+    CtAST* type;
+    CtAST* ret;
+    CtASTList* args = astListNew(NULL);
+    CtASTList* tail = args;
+
+    parseExpectKey(self, K_LPAREN);
+
+    do { tail = astListAdd(tail, parseType(self)); } while (parseConsumeKey(self, K_COMMA));
+
+    parseExpectKey(self, K_RPAREN);
+
+    if (parseConsumeKey(self, K_ARROW))
+    {
+        ret = parseType(self);
+    }
+    else
+    {
+        ret = NULL;
+    }
+
+    type = astNew(AK_FUNCTYPE);
+    type->data.funcptr.args = args;
+    type->data.funcptr.ret = ret;
+
+    return type;
+}
+
+static CtAST* parseBuiltinType(CtToken tok)
+{
+    char* name = tok.data.ident;
+
+    /* TODO */
+
+    if (strcmp(name, "i8") == 0)
+    {
+
+    }
+    else if (strcmp(name, "i16") == 0)
+    {
+
+    }
+    else if (strcmp(name, "i32") == 0)
+    {
+
+    }
+    else if (strcmp(name, "i64") == 0)
+    {
+
+    }
+    else if (strcmp(name, "void") == 0)
+    {
+
+    }
+    else
+    {
+        return NULL;
+    }
+}
+
+static CtAST* parseNameType(CtParser* self, CtToken tok)
+{
+    CtAST* type;
+    CtASTList* name;
+    CtASTList* tail;
+
+    type = parseBuiltinType(tok);
+
+    if (type != NULL)
+        return type;
+
+    type = astNew(AK_IDENT);
+    type->tok = tok;
+
+    name = astListNew(type);
+
+    while (parseConsumeKey(self, K_COLON2))
+    {
+        tail = astListAdd(self, parseExpectIdent(self));
+    }
+
+    type = astNew(AK_NAMETYPE);
+    type->data.nametype.path = name;
+
+    return type;
+}
+
+static CtAST* parseType(CtParser* self)
+{
+    CtAST* type;
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_KEYWORD)
+    {
+        if (tok.data.key == K_MUL)
+        {
+            type = parsePointerType(self);
+        }
+        else if (tok.data.key == K_LSQUARE)
+        {
+            type = parseArrayType(self);
+        }
+        else if (tok.data.key == K_DEF)
+        {
+            type = parseFuncType(self);
+        }
+        else
+        {
+            /* error */
+        }
+    }
+    else if (tok.kind == TK_IDENT)
+    {
+        type = parseNameType(self, tok);
+    }
+    else
+    {
+        /* error */
+    }
+
+    return type;
+}
+
+static CtAST* parseStructField(CtParser* self)
+{
+    CtAST* name;
+    CtAST* type;
+    CtAST* field;
+
+    name = parseExpectIdent(self);
+
+    parseExpectKey(self, K_COLON);
+
+    type = parseType(self);
+
+    parseExpectKey(self, K_SEMI);
+
+
+    field = astNew(AK_FIELD);
+    field->data.field.name = name;
+    field->data.field.type = type;
+
+    return field;
+}
+
+static CtASTList* parseStructFields(CtParser* self)
+{
+    CtASTList* fields = astListNew(NULL);
+    CtASTList* tail = fields;
+
+    while (!parseConsumeKey(self, K_RBRACE))
+    {
+        tail = astListAdd(tail, parseStructField(self));
+    }
+
+    return fields;
+}
+
+static CtAST* parseStruct(CtParser* self)
+{
+    CtAST* struc;
+    CtAST* name;
+    CtASTList* fields;
+
+    name = parseExpectIdent(self);
+
+    parseExpectKey(self, K_LBRACE);
+
+    fields = parseStructFields(self);
+
+    struc = astNew(AK_STRUCT);
+    struc->data.struc.attribs = takeAttribs(self);
+    struc->data.struc.name = name;
+    struc->data.struc.fields = fields;
+
+    return struc;
+}
+
+static CtASTList* parseBody(CtParser* self)
+{
+    CtASTList* items = astListNew(NULL);
+    CtASTList* tail = items;
+
+    while (1)
+    {
+        if (parseConsumeKey(self, K_AT))
+        {
+            parseAttribs(self);
+        }
+        else if (parseConsumeKey(self, K_STRUCT))
+        {
+            tail = astListAdd(tail, parseStruct(self));
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return items;
+}
+
+CtAST* ctParseUnit(CtParser* self)
+{
+    CtAST* unit = astNew(AK_UNIT);
+
+    unit->data.unit.imports = parseImports(self);
+
+    unit->data.unit.body = parseBody(self);
+
+    return unit;
+}

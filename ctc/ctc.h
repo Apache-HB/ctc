@@ -106,23 +106,112 @@ typedef struct {
     CtStream* stream;
 } CtLexer;
 
-CtLexer* lexOpen(CtStream* stream);
+CtLexer* ctLexOpen(CtStream* stream);
 
 typedef struct {
     CtLexer* source;
     CtToken tok;
+
+    struct CtASTList* attribs;
+    struct CtASTList* tail;
 } CtParser;
 
-CtParser* parseOpen(CtLexer* source);
+CtParser* ctParseOpen(CtLexer* source);
+
+
+typedef enum {
+    AK_UNIT,
+    AK_IMPORT,
+    AK_IDENT,
+    AK_ATTRIB,
+    AK_STRUCT,
+    AK_FIELD,
+
+    AK_PTRTYPE,
+    AK_ARRTYPE,
+    AK_FUNCTYPE,
+    AK_NAMETYPE,
+    AK_BUILTINTYPE
+} CtASTKind;
+
+typedef struct CtASTList {
+    struct CtAST* item;
+    struct CtASTList* next;
+} CtASTList;
 
 typedef struct {
-    CtToken source;
+    CtASTList* imports;
+    CtASTList* body;
+} CtASTUnit;
+
+typedef struct {
+    CtASTList* path;
+    CtASTList* items;
+} CtASTImport;
+
+typedef struct {
+    CtASTList* path;
+} CtASTAttrib;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+} CtASTField;
+
+typedef struct {
+    CtASTList* attribs;
+    struct CtAST* name;
+    CtASTList* fields;
+} CtASTStruct;
+
+
+typedef struct {
+    struct CtAST* type;
+} CtASTPtrType;
+
+typedef struct {
+    struct CtAST* type;
+    struct CtAST* size;
+} CtASTArrType;
+
+typedef struct {
+    CtASTList* args;
+    struct CtAST* ret;
+} CtASTFuncType;
+
+typedef struct {
+    CtASTList* path;
+} CtASTNameType;
+
+typedef enum {
+    BT_I8,
+    BT_I16,
+    BT_I32,
+    BT_I64,
+    BT_VOID
+} CtASTBuiltinType;
+
+typedef union {
+    CtASTUnit unit;
+    CtASTImport import;
+    CtASTAttrib attrib;
+    CtASTStruct struc;
+    CtASTField field;
+
+    CtASTPtrType ptr;
+    CtASTArrType arr;
+    CtASTFuncType funcptr;
+    CtASTNameType nametype;
+    CtASTBuiltinType builtin;
+} CtASTData;
+
+typedef struct CtAST {
+    CtToken tok;
+    CtASTKind kind;
+    CtASTData data;
 } CtAST;
 
 /* parse a full compilation unit */
-CtAST* parseUnit(CtParser* parser);
-
-/* parse a single item in a stream, for repl stuff */
-CtAST* parseItem(CtParser* parser);
+CtAST* ctParseUnit(CtParser* self);
 
 #endif /* CTC_H */
