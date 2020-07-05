@@ -807,6 +807,22 @@ static CtAST* parseUnitDecl(CtParser* self)
 
     }
 
+    while (1)
+    {
+        if (parseConsumeKey(self, K_DEF))
+        {
+
+        }
+        else if (parseConsumeKey(self, K_AT))
+        {
+
+        }
+        else
+        {
+            break;
+        }
+    }
+
     return unit;
 }
 
