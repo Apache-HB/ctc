@@ -1,8 +1,8 @@
-# Decorators
+# Attributes
 
-Decorators are compiler and user defined constructs used at compile time to effect semantics and code generation.
+Attributes are compiler and user defined constructs used at compile time to effect semantics and code generation.
 
-## Builtin decorators
+## Builtin Attributes
 
 These are provided through the `std::builtin` module and give access to behavior that is unable to be provided through the language itself such as export visibility or function calling conventions.
 
@@ -37,7 +37,7 @@ struct IntPair {
 
 ### Compile
 
-`std::builtin::compile` marks a function as executable at compile time as opposed to runtime. Compile time functions are not guaranteed to be executed at compile time and may still be run at runtime. Compile time functions must not produce side effects and may not contain UB.
+`std::builtin::compile` marks a function as executable at compile time as opposed to runtime. Compile time functions are not guaranteed to be executed at compile time and may still be run at runtime. Compile time functions must not produce side effects and may not contain UB or PDB, IDB is allowed.
 
 ```ct
 import std::builtin(compile);
@@ -65,7 +65,7 @@ def func {
 }
 ```
 
-perms cannot be applied to functions that are marked with the `compile` decorator.
+perms cannot be applied to functions that are marked with the `compile` Attribute.
 
 ### Callconv
 

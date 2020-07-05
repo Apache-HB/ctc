@@ -923,6 +923,12 @@ static void parseAttribs(CtParser* self)
 
 static CtAST* parseType(CtParser* self);
 
+static CtAST* parseExpr(CtParser* self)
+{
+    /* TODO */
+    return NULL;
+}
+
 static CtAST* parsePointerType(CtParser* self)
 {
     CtAST* type;
@@ -1038,10 +1044,11 @@ static CtAST* parseNameType(CtParser* self, CtToken tok)
     type->tok = tok;
 
     name = astListNew(type);
+    tail = name;
 
     while (parseConsumeKey(self, K_COLON2))
     {
-        tail = astListAdd(self, parseExpectIdent(self));
+        tail = astListAdd(tail, parseExpectIdent(self));
     }
 
     type = astNew(AK_NAMETYPE);
@@ -1052,7 +1059,7 @@ static CtAST* parseNameType(CtParser* self, CtToken tok)
 
 static CtAST* parseType(CtParser* self)
 {
-    CtAST* type;
+    CtAST* type = NULL;
     CtToken tok = parseNext(self);
 
     if (tok.kind == TK_KEYWORD)
