@@ -1,6 +1,6 @@
 CC = clang
 
-CFLAGS = -Wextra -Weverything -Wall -Werror -Wno-padded -pedantic -std=c89
+CFLAGS = -Wextra -Weverything -Wall -Werror -Wno-padded -pedantic -std=c89 -g
 
 all:
 	mkdir -p build

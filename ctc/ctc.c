@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <errno.h>
+#include <stdio.h>
 
 static char* cstrdup(const char* str)
 {
@@ -73,12 +74,6 @@ static int streamConsume(CtStream* self, int c)
     }
 
     return 0;
-}
-
-static void streamClose(CtStream* self)
-{
-    self->callbacks.close(self->data);
-    free(self);
 }
 
 /**
@@ -193,11 +188,6 @@ enum {
     STR_CONTINUE
 };
 
-static void lexHexEscape(CtLexer* self, CtBuffer* buf)
-{
-
-}
-
 static void lexEscapeChar(CtLexer* self, CtBuffer* buf)
 {
     int c = streamNext(self->stream);
@@ -219,10 +209,9 @@ static void lexEscapeChar(CtLexer* self, CtBuffer* buf)
     case '0':
         bufPush(buf, '\0');
         break;
-    case 'x':
-        lexHexEscape(self, buf);
-        break;
+    /* TODO: hex escapes */
     default:
+        bufPush(buf, (char)c);
         /* error */
         break;
     }
@@ -265,10 +254,14 @@ static void lexSingleString(CtLexer* self, CtBuffer* buf)
         res = lexSingleChar(self, buf);
         if (res == STR_NL)
         {
+            printf("newline\n");
+            break;
             /* error */
         }
         else if (res == STR_ERR)
         {
+            printf("error\n");
+            break;
             /* error */
         }
         else if (res == STR_END)
@@ -308,6 +301,8 @@ static void lexMultiString(CtLexer* self, CtBuffer* buf)
         }
         else if (res == STR_ERR)
         {
+            printf("error\n");
+            break;
             /* error */
         }
         else if (res == STR_NL)
@@ -318,8 +313,9 @@ static void lexMultiString(CtLexer* self, CtBuffer* buf)
     }
 }
 
-static char* lexString(CtLexer* self)
+static CtString lexString(CtLexer* self)
 {
+    CtString out;
     CtBuffer buf;
 
     if (streamConsume(self->stream, '"'))
@@ -329,11 +325,13 @@ static char* lexString(CtLexer* self)
             /* is a multiline string */
             buf = bufNew(128);
             lexMultiString(self, &buf);
-
         }
-
-        /* TODO: need some globals and stuff */
-        return cstrdup("");
+        else
+        {
+            /* TODO: need some globals and stuff */
+            buf.ptr = cstrdup("");
+            buf.len = 0;
+        }
     }
     else
     {
@@ -342,7 +340,10 @@ static char* lexString(CtLexer* self)
         lexSingleString(self, &buf);
     }
 
-    return buf.ptr;
+    out.string = buf.ptr;
+    out.len = buf.len;
+
+    return out;
 }
 
 
@@ -360,17 +361,19 @@ static CtKeyLookup key_table[] = {
 };
 #define KEY_TABLE_SIZE (sizeof(key_table) / sizeof(CtKeyLookup))
 
-static void lexIdent(CtLexer* self, int c, CtToken* out)
+static void lexIdent(CtLexer* self, CtToken* out, int c)
 {
     size_t i;
     CtBuffer buf = bufNew(64);
-    bufPush(&buf, (char)c);
+
+    if (c)
+        bufPush(&buf, (char)c);
 
     while (isident2(streamPeek(self->stream)))
         bufPush(&buf, (char)streamNext(self->stream));
 
     /* check if its a keyword */
-    for (i = 0; i > KEY_TABLE_SIZE; i++)
+    for (i = 0; i < KEY_TABLE_SIZE; i++)
     {
         if (strcmp(buf.ptr, key_table[i].str) == 0)
         {
@@ -387,8 +390,8 @@ static void lexIdent(CtLexer* self, int c, CtToken* out)
          * then this is a string prefix
          */
         out->kind = TK_STRING;
+        out->data.string = lexString(self);
         out->data.string.prefix = buf.ptr;
-        out->data.string.string = lexString(self);
     }
     else
     {
@@ -397,8 +400,6 @@ static void lexIdent(CtLexer* self, int c, CtToken* out)
         out->data.ident = buf.ptr;
     }
 }
-
-
 
 static void lexSymbol(CtLexer* self, int c, CtToken* out)
 {
@@ -515,19 +516,84 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
 }
 
 
+/* base 16 integer */
 static CtDigit lexHexDigit(CtLexer* self)
 {
+    int c;
+    CtDigit out;
+    CtBuffer buf = bufNew(32);
+    streamNext(self->stream);
 
+    while (1)
+    {
+        c = streamPeek(self->stream);
+        if (isxdigit(c))
+        {
+            bufPush(&buf, (char)streamNext(self->stream));
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    out = strtoul(buf.ptr, NULL, 16);
+    free(buf.ptr);
+
+    return out;
 }
 
+/* base 2 integer */
 static CtDigit lexBinDigit(CtLexer* self)
 {
+    int c;
+    CtDigit out;
+    CtBuffer buf = bufNew(32);
+    streamNext(self->stream);
 
+    while (1)
+    {
+        c = streamPeek(self->stream);
+        if (c == '0' || c == '1')
+        {
+            bufPush(&buf, (char)streamNext(self->stream));
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    out = strtoul(buf.ptr, NULL, 2);
+    free(buf.ptr);
+
+    return out;
 }
 
+/* base 10 integer */
 static CtDigit lexDigit1(CtLexer* self, int c)
 {
+    CtDigit out;
+    CtBuffer buf = bufNew(32);
+    bufPush(&buf, (char)c);
 
+    while (1)
+    {
+        c = streamPeek(self->stream);
+        if (isdigit(c))
+        {
+            bufPush(&buf, (char)streamNext(self->stream));
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    out = strtoul(buf.ptr, NULL, 10);
+    free(buf.ptr);
+
+    return out;
 }
 
 static CtDigit lexDigit0(CtLexer* self)
@@ -536,29 +602,29 @@ static CtDigit lexDigit0(CtLexer* self)
 
     if (c == 'x')
     {
+        /* base 16 */
         return lexHexDigit(self);
     }
     else if (c == 'b')
     {
+        /* base 2 */
         return lexBinDigit(self);
     }
     else if (isdigit(c))
     {
-        return lexDigit1(self, '0');
+        /* base 10 */
+        return lexDigit1(self, streamNext(self->stream));
     }
     else
     {
+        /* just 0 */
         return 0;
     }
 }
 
-static char* lexDigitSuffix(CtLexer* self, int c)
-{
-
-}
-
 static CtNumber lexDigit(CtLexer* self, int c)
 {
+    CtToken suffix;
     CtNumber num;
 
     if (c == '0')
@@ -570,11 +636,20 @@ static CtNumber lexDigit(CtLexer* self, int c)
         num.digit = lexDigit1(self, c);
     }
 
-    c = streamPeek(self->stream);
-    if (!isspace(c))
+    if (isident1(streamPeek(self->stream)))
     {
         /* we have a digit suffix */
-        num.suffix = lexDigitSuffix(self, c);
+        lexIdent(self, &suffix, '\0');
+
+        if (suffix.kind != TK_IDENT)
+        {
+            /* keywords directly after a string are invalid */
+            num.suffix = NULL;
+        }
+        else
+        {
+            num.suffix = suffix.data.ident;
+        }
     }
     else
     {
@@ -602,12 +677,12 @@ static CtToken lexNext(CtLexer* self)
     else if (isident1(c))
     {
         /* will be either a keyword, ident, or a string with a prefix */
-        lexIdent(self, c, &tok);
+        lexIdent(self, &tok, c);
     }
     else if (c == '"')
     {
         /* is a string */
-        tok.data.string.string = lexString(self);
+        tok.data.string = lexString(self);
         tok.data.string.prefix = NULL;
         tok.kind = TK_STRING;
     }
@@ -677,13 +752,78 @@ static int parseConsumeKey(CtParser* self, CtKeyword key)
     return 0;
 }
 
+static const char* keyStr(CtKeyword key)
+{
+#define OP(id, str) case id: return str;
+#define KEY(id, str) case id: return str;
+    switch (key)
+    {
+#include "keys.inc"
+    case K_INVALID: return "invalid";
+    }
+}
+
+static void tokPrint(CtToken* tok)
+{
+    printf("[%s:%d:%d] = ", tok->pos.parent->name, tok->pos.line, tok->pos.col);
+
+    switch (tok->kind)
+    {
+    case TK_EOF:
+        printf("EOF\n");
+        break;
+    case TK_INVALID:
+        printf("INVALID\n");
+        break;
+    case TK_IDENT:
+        printf("IDENT(%s)\n", tok->data.ident);
+        break;
+    case TK_KEYWORD:
+        printf("KEYWORD(%s)\n", keyStr(tok->data.key));
+        break;
+    case TK_INT:
+        printf("INT(%lu[%s])\n", tok->data.digit.digit, tok->data.digit.suffix);
+        break;
+    case TK_STRING:
+        printf("STR([%s]\"\"\"%s\"\"\")\n", tok->data.string.prefix, tok->data.string.string);
+        break;
+    }
+}
+
+static CtAST* astNew(CtASTType type)
+{
+    CtAST* ast = malloc(sizeof(CtAST));
+    ast->type = type;
+
+    return ast;
+}
+
+static CtAST* parseUnitDecl(CtParser* self)
+{
+    CtAST* unit = astNew(AT_UNIT);
+
+    while (parseConsumeKey(self, K_IMPORT))
+    {
+
+    }
+
+    return unit;
+}
+
 CtAST* ctParse(CtStream* stream)
 {
     CtLexer* lex;
     CtParser* parse;
+    CtAST* ast;
+
+    (void)tokPrint;
+    (void)parseConsume;
+    (void)parseConsumeKey;
 
     lex = lexOpen(stream);
     parse = parseOpen(lex);
 
-    return NULL;
+    ast = parseUnitDecl(parse);
+
+    return ast;
 }

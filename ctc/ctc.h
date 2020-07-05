@@ -1,6 +1,8 @@
 #ifndef CTC_H
 #define CTC_H
 
+#include <stddef.h>
+
 typedef struct {
     /* source of the position */
     struct CtStream* parent;
@@ -16,7 +18,6 @@ typedef struct {
 
 typedef struct {
     void*(*open)(const char*);
-    void(*close)(void*);
     int(*next)(void*);
 } CtStreamCallbacks;
 
@@ -65,6 +66,7 @@ typedef enum {
 
 typedef struct {
     char* string;
+    size_t len;
     char* prefix;
 } CtString;
 

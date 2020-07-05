@@ -3,5 +3,23 @@ import std::traits(noreturn);
 
 @[noreturn, sys::entry(:CLI)]
 def cli_main {
-    sys::exit(0);
+    var str = "something";
+    var prefix = u8"honk";
+    var multi = """
+        yeet
+        more
+        stuff
+    """;
+
+    var prefix_multi = hjhjh"""
+    asdasd
+    asdasd
+    """;
+
+    var num = 2734782317;
+    var bin = 0b0110101;
+    var hex = 0x7878afA78;
+    var num = 00011;
+
+    sys::exit(0suffix);
 }
