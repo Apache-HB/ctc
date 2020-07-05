@@ -765,7 +765,7 @@ static const char* keyStr(CtKeyword key)
 
 static void tokPrint(CtToken* tok)
 {
-    printf("[%s:%d:%d] = ", tok->pos.parent->name, tok->pos.line, tok->pos.col);
+    printf("[%s:%d:%d] = ", tok->pos.parent->name, tok->pos.line + 1, tok->pos.col);
 
     switch (tok->kind)
     {
