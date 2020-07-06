@@ -100,6 +100,11 @@ static void dumpType(CtAST* type)
         printf("*");
         dumpType(type->data.ptr);
     }
+    else if (type->kind == AK_REFERENCE)
+    {
+        printf("&");
+        dumpType(type->data.ref);
+    }
     else if (type->kind == AK_FUNCPTR)
     {
         dumpFuncptr(type->data.funcptr);

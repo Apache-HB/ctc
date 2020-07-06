@@ -131,6 +131,7 @@ typedef enum {
     AK_BUILTIN,
     AK_TYPENAME,
     AK_POINTER,
+    AK_REFERENCE,
     AK_FUNCPTR
 } CtASTKind;
 
@@ -179,6 +180,7 @@ typedef union {
     CtBuiltin builtin;
     CtASTList* name;
     struct CtAST* ptr;
+    struct CtAST* ref;
     CtFuncptr funcptr;
 } CtASTData;
 

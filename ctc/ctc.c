@@ -982,7 +982,6 @@ static CtAST* parseType(CtParser* self)
     if (tok.kind == TK_IDENT)
     {
         type = parseNameType(self, tok);
-        goto end;
     }
     else if (tok.kind == TK_KEYWORD)
     {
@@ -990,20 +989,30 @@ static CtAST* parseType(CtParser* self)
         {
             type = astNew(AK_POINTER);
             type->data.ptr = parseType(self);
-            goto end;
+        }
+        else if (tok.data.key == K_BITAND)
+        {
+            type = astNew(AK_REFERENCE);
+            type->data.ref = parseType(self);
         }
         else if (tok.data.key == K_DEF)
         {
             type = parseFuncPtr(self);
-            goto end;
+        }
+        else
+        {
+            goto err;
         }
     }
+    else
+    {
+        goto err;
+    }
 
-    /* error */
-    type = NULL;
-
-end:
     return type;
+
+err:
+    return NULL;
 }
 
 static CtAST* parseAlias(CtParser* self)
@@ -1027,6 +1036,15 @@ static CtAST* parseAlias(CtParser* self)
     return alias;
 }
 
+static CtAST* parseFunc(CtParser* self)
+{
+    CtAST* name;
+    CtASTList* args;
+    CtAST* result;
+    CtAST* body;
+    CtAST* func;
+}
+
 static CtASTList* parseBody(CtParser* self)
 {
     CtASTList* body = astListNew(NULL);
@@ -1037,6 +1055,10 @@ static CtASTList* parseBody(CtParser* self)
         if (parseConsumeKey(self, K_ALIAS))
         {
             tail = astListAdd(tail, parseAlias(self));
+        }
+        else if (parseConsumeKey(self, K_DEF))
+        {
+            tail = astListAdd(tail, parseFunc(self));
         }
         else
         {

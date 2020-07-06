@@ -44,7 +44,7 @@ varBody : ':' type | (':' type)? '=' expr ;
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' ;
+stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' | funcDecl | aliasDecl ;
 
 returnStmt : 'return' expr? ';' ;
 
@@ -65,10 +65,12 @@ type
     | ptrType
     | arrayType
     | funcType
+    | refType
     ;
 
 nameType : Ident ('::' Ident)* ;
 ptrType : '*' type ;
+refType : '&' type ;
 arrayType : '[' type ':' arrayTypeBody ']' ;
 arrayTypeBody : 'var' | expr ;
 funcType : 'def' '(' funcTypeArgs? ')' funcTypeTail? ;

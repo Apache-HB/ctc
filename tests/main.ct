@@ -10,3 +10,4 @@ alias j = a::b::c;
 alias ptr = *void;
 
 alias func = def(*********void, nuahjksgd, ashj, hjkasd::hjkasd) -> *void;
+alias ref = &aaa;
