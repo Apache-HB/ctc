@@ -163,7 +163,8 @@ typedef enum {
     BL_I16,
     BL_I32,
     BL_I64,
-    BL_VOID
+    BL_VOID,
+    BL_BOOL
 } CtBuiltin;
 
 typedef struct {

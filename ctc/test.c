@@ -60,6 +60,7 @@ static void dumpBuiltin(CtBuiltin blt)
     case BL_U64: printf("u64"); break;
 
     case BL_VOID: printf("void"); break;
+    case BL_BOOL: printf("bool"); break;
     }
 }
 

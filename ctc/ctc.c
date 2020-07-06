@@ -893,6 +893,7 @@ static CtAST* parseBuiltinType(CtToken tok)
     CT_TYPE("u64", BL_U64)
 
     CT_TYPE("void", BL_VOID)
+    CT_TYPE("bool", BL_BOOL)
 
 #undef CT_TYPE
 

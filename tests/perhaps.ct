@@ -1,0 +1,12 @@
+# for things im not sure about
+
+# macros expand into expressions
+macro await<T> {
+
+}
+
+# trait for a struct, union or enum
+# but not a function
+trait debug<T: struct | union | enum> {
+
+}
