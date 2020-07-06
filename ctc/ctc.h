@@ -19,6 +19,8 @@ typedef struct {
 typedef struct {
     void*(*open)(const char*);
     int(*next)(void*);
+
+    void(*err)(CtStreamPos, char*);
 } CtStreamCallbacks;
 
 typedef struct CtStream {
@@ -104,6 +106,7 @@ CtStream* ctOpen(CtStreamCallbacks callbacks, const char* path);
 
 typedef struct {
     CtStream* stream;
+    char* err;
 } CtLexer;
 
 CtLexer* ctLexOpen(CtStream* stream);
@@ -112,8 +115,7 @@ typedef struct {
     CtLexer* source;
     CtToken tok;
 
-    struct CtASTList* attribs;
-    struct CtASTList* tail;
+    char* err;
 } CtParser;
 
 CtParser* ctParseOpen(CtLexer* source);
@@ -123,15 +125,13 @@ typedef enum {
     AK_UNIT,
     AK_IMPORT,
     AK_IDENT,
-    AK_ATTRIB,
-    AK_STRUCT,
-    AK_FIELD,
 
-    AK_PTRTYPE,
-    AK_ARRTYPE,
-    AK_FUNCTYPE,
-    AK_NAMETYPE,
-    AK_BUILTINTYPE
+    AK_ALIAS,
+
+    AK_BUILTIN,
+    AK_TYPENAME,
+    AK_POINTER,
+    AK_FUNCPTR
 } CtASTKind;
 
 typedef struct CtASTList {
@@ -150,59 +150,35 @@ typedef struct {
 } CtASTImport;
 
 typedef struct {
-    CtASTList* path;
-} CtASTAttrib;
-
-typedef struct {
     struct CtAST* name;
-    struct CtAST* type;
-} CtASTField;
+    struct CtAST* symbol;
+} CtASTAlias;
 
-typedef struct {
-    CtASTList* attribs;
-    struct CtAST* name;
-    CtASTList* fields;
-} CtASTStruct;
-
-
-typedef struct {
-    struct CtAST* type;
-} CtASTPtrType;
-
-typedef struct {
-    struct CtAST* type;
-    struct CtAST* size;
-} CtASTArrType;
+typedef enum {
+    BL_U8,
+    BL_U16,
+    BL_U32,
+    BL_U64,
+    BL_I8,
+    BL_I16,
+    BL_I32,
+    BL_I64,
+    BL_VOID
+} CtBuiltin;
 
 typedef struct {
     CtASTList* args;
-    struct CtAST* ret;
-} CtASTFuncType;
-
-typedef struct {
-    CtASTList* path;
-} CtASTNameType;
-
-typedef enum {
-    BT_I8,
-    BT_I16,
-    BT_I32,
-    BT_I64,
-    BT_VOID
-} CtASTBuiltinType;
+    struct CtAST* result;
+} CtFuncptr;
 
 typedef union {
     CtASTUnit unit;
     CtASTImport import;
-    CtASTAttrib attrib;
-    CtASTStruct struc;
-    CtASTField field;
-
-    CtASTPtrType ptr;
-    CtASTArrType arr;
-    CtASTFuncType funcptr;
-    CtASTNameType nametype;
-    CtASTBuiltinType builtin;
+    CtASTAlias alias;
+    CtBuiltin builtin;
+    CtASTList* name;
+    struct CtAST* ptr;
+    CtFuncptr funcptr;
 } CtASTData;
 
 typedef struct CtAST {

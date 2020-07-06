@@ -1,25 +1,12 @@
 import std::sys;
 import std::traits(noreturn, honk);
 
-@[noreturn, sys::entry(:CLI)]
-def cli_main {
-    var str = "something";
-    var prefix = u8"honk";
-    var multi = """
-        yeet
-        more
-        stuff
-    """;
+alias x = y;
 
-    var prefix_multi = hjhjh"""
-    asdasd
-    asdasd
-    """;
+alias y = u8;
 
-    var num = 2734782317;
-    var bin = 0b0110101;
-    var hex = 0x7878afA78;
-    var num = 00011;
+alias j = a::b::c;
 
-    sys::exit(0suffix);
-}
+alias ptr = *void;
+
+alias func = def(*********void, nuahjksgd, ashj, hjkasd::hjkasd) -> *void;
