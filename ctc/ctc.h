@@ -16,11 +16,21 @@ typedef struct {
     int col;
 } CtStreamPos;
 
+/**
+ * a range of characters in a source stream
+ */
 typedef struct {
-    void*(*open)(const char*);
-    int(*next)(void*);
+    struct CtStream* parent;
 
-    void(*err)(CtStreamPos, char*);
+    int pos;
+    int line;
+    int col;
+    int len;
+} CtStreamRange;
+
+typedef struct {
+    /* get the next character from a stream, return -1 on EOF */
+    int(*next)(void*);
 } CtStreamCallbacks;
 
 typedef struct CtStream {
@@ -46,16 +56,18 @@ typedef struct CtStream {
 typedef enum {
     TK_IDENT,
     TK_STRING,
+    TK_CHAR,
     TK_INT,
     TK_KEYWORD,
+    TK_ERROR,
     TK_EOF,
 
     /* internal token kind */
     TK_INVALID
 } CtTokenKind;
 
-typedef unsigned long CtDigit;
-typedef unsigned long CtChar;
+typedef unsigned long long CtDigit;
+typedef unsigned long long CtChar;
 
 typedef enum {
 #define OP(id, str) id,
@@ -72,9 +84,16 @@ typedef struct {
     char* prefix;
 } CtString;
 
+typedef enum {
+    NE_INT,
+    NE_HEX,
+    NE_BIN
+} CtNumberEncoding;
+
 typedef struct {
     CtDigit digit;
     char* suffix;
+    CtNumberEncoding enc;
 } CtNumber;
 
 typedef union {
@@ -90,7 +109,10 @@ typedef union {
     /* TK_KEYWORD */
     CtKeyword key;
 
-    /* TK_INVALID */
+    /* TK_CHAR */
+    CtChar letter;
+
+    /* TK_ERROR */
     char* reason;
 
     /* TK_EOF */
@@ -102,14 +124,34 @@ typedef struct {
     CtStreamPos pos;
 } CtToken;
 
-CtStream* ctOpen(CtStreamCallbacks callbacks, const char* path);
+/* cleanup a token */
+void ctFreeToken(CtToken tok);
+
+CtStream* ctStreamOpen(CtStreamCallbacks callbacks, void* data, const char* path);
+void ctStreamClose(CtStream* self);
+
+typedef struct {
+    char* ptr;
+    size_t alloc;
+    size_t len;
+} CtBuffer;
 
 typedef struct {
     CtStream* stream;
     char* err;
+
+    /* reused buffer */
+    CtBuffer reuse;
 } CtLexer;
 
+/* open a lexing stream */
 CtLexer* ctLexOpen(CtStream* stream);
+
+/* get a single token from the stream */
+CtToken ctLexNext(CtLexer* self);
+
+/* cleanup the lexer */
+void ctLexClose(CtLexer* self);
 
 typedef struct {
     CtLexer* source;
@@ -120,6 +162,7 @@ typedef struct {
 
 CtParser* ctParseOpen(CtLexer* source);
 
+void ctParseClose(CtParser* self);
 
 typedef enum {
     AK_UNIT,
@@ -127,104 +170,10 @@ typedef enum {
     AK_IDENT,
 
     AK_ALIAS,
-    AK_STRUCT,
-
-    AK_BUILTIN,
-    AK_TYPENAME,
-    AK_POINTER,
-    AK_REFERENCE,
-    AK_FUNCPTR,
-    AK_FUNCTION,
-
-    AK_ARGUMENT,
-
-    AK_FIELD,
-    AK_ENUM_FIELD
 } CtASTKind;
 
-typedef struct CtASTList {
-    struct CtAST* item;
-    struct CtASTList* next;
-} CtASTList;
-
-typedef struct {
-    CtASTList* imports;
-    CtASTList* body;
-} CtASTUnit;
-
-typedef struct {
-    CtASTList* path;
-    CtASTList* items;
-} CtASTImport;
-
-typedef struct {
-    struct CtAST* name;
-    struct CtAST* symbol;
-} CtASTAlias;
-
-typedef enum {
-    BL_U8,
-    BL_U16,
-    BL_U32,
-    BL_U64,
-    BL_I8,
-    BL_I16,
-    BL_I32,
-    BL_I64,
-    BL_VOID,
-    BL_BOOL
-} CtBuiltin;
-
-typedef struct {
-    CtASTList* args;
-    struct CtAST* result;
-} CtFuncptr;
-
-typedef struct {
-    struct CtAST* name;
-    CtASTList* args;
-    struct CtAST* result;
-    struct CtAST* body;
-} CtFunction;
-
-typedef struct {
-    struct CtAST* name;
-    struct CtAST* type;
-    struct CtAST* init;
-} CtASTArg;
-
-typedef struct {
-    struct CtAST* name;
-    struct CtAST* type;
-} CtASTField;
-
-typedef struct {
-    struct CtAST* name;
-    CtASTList* fields;
-} CtASTStruct;
-
-typedef struct {
-    struct CtAST* name;
-    CtASTList* data;
-    struct CtAST* val;
-} CtASTEnumField;
-
 typedef union {
-    CtASTUnit unit;
-    CtASTImport import;
-    CtASTAlias alias;
-    CtBuiltin builtin;
-    CtASTList* name;
-    struct CtAST* ptr;
-    struct CtAST* ref;
-    CtFuncptr funcptr;
-    CtFunction func;
-    CtASTArg arg;
-    CtASTList* list;
-
-    CtASTEnumField efield;
-    CtASTStruct struc;
-    CtASTField field;
+    void* TODO;
 } CtASTData;
 
 typedef struct CtAST {
@@ -233,7 +182,12 @@ typedef struct CtAST {
     CtASTData data;
 } CtAST;
 
-/* parse a full compilation unit */
+
+
+/* parse a single item using the `interp` rule in cthulhu.g4 */
+CtAST* ctParseNext(CtParser* self);
+
+/* parse a full compilation unit using the `unit` rule in cthulhu.g4 */
 CtAST* ctParseUnit(CtParser* self);
 
 #endif /* CTC_H */

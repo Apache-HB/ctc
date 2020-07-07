@@ -6,6 +6,7 @@
 * Standardized ABI
 * The target matters
 * Performance by default
+* No runtime
 
 ## Reference
 

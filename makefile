@@ -1,10 +1,18 @@
 CC = clang
 
-CFLAGS = -Wextra -Weverything -Wall -Werror -Wno-padded -Wno-format-nonliteral -pedantic -std=c89 -g
+CFLAGS = -Wextra -Weverything -Wall -Werror \
+	-Wno-padded -Wno-switch-enum -Wno-format-nonliteral \
+	-pedantic -std=c99 -g \
+	-DPRINTF_DISABLE_SUPPORT_LONG_LONG \
+	-DPRINTF_DISABLE_SUPPORT_FLOAT \
+	-I. \
+	-mno-x87
 
-all:
+setup:
 	mkdir -p build
-	$(CC) ctc/ctc.c -c $(CFLAGS) -o build/ctc.o
 
-test: all
-	$(CC) ctc/test.c build/ctc.o -o build/test $(CFLAGS)
+test: setup
+	$(CC) ctc/tests/test.c -o build/test $(CFLAGS)
+
+interp: setup
+	$(CC) ctc/tests/interp.c -o build/interp $(CFLAGS)

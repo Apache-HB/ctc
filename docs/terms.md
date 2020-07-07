@@ -14,4 +14,4 @@ Behavior that is undefined and has no guarantees. Compilers are not required to 
 
 ## Compilation Unit (CU)
 
-Each file compiled is a single compilation unit. Compilers are allowed to combine multiple files into single compilation units.
+Each file compiled is a single compilation unit. Compilers are allowed to combine multiple files into single compilation units as long as symbol hierarchy is properly preserved.

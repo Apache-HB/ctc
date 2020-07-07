@@ -1,32 +1,29 @@
 grammar cthulhu;
 
+// compiling a file
 unit : importDecl* bodyDecl* EOF ;
+
+// interpreting a file
+interp : (importDecl | bodyDecl)* EOF ;
 
 importDecl : 'import' importPath importSpec? ';' ;
 
 importPath : Ident ('::' Ident)* ;
 importSpec : '(' Ident (',' Ident)* ')' ;
 
-bodyDecl : decorator* (funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl) ;
+bodyDecl : funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl ;
 
-decorator : '@' decoratorItem | '@' '[' decoratorItem (',' decoratorItem) ']' ;
-decoratorItem : decoratorName callExpr? ;
-decoratorName : Ident ('::' Ident)* ;
-
-objectField : decorator* (varDecl | aliasDecl | funcDecl) ;
+objectField : (varDecl | aliasDecl | funcDecl) ;
 objectDecl : 'object' Ident '{' objectField* '}' ;
 
-structField : Ident ':' type ';' ;
-structDecl : 'struct' Ident '{' structField* '}' ;
+field : Ident ':' type ';' ;
 
-unionField : Ident ':' type ';' ;
-unionDecl : 'union' Ident '{' unionField* '}' ;
+structDecl : 'struct' Ident '{' field* '}' ;
+unionDecl : 'union' Ident '{' field* '}' ;
 
-enumData : '{' structField+ '}' ;
-enumField : Ident enumData? ('=' expr)? ;
+enumField : Ident ('=' expr)? ;
 enumFields : enumField (',' enumField)* ;
-enumBacking : ':' type ;
-enumDecl : 'enum' Ident enumBacking? '{' enumFields? '}' ;
+enumDecl : 'enum' Ident (':' type)? '{' enumFields? '}' ;
 
 funcDecl : 'def' funcName funcArgs? funcTail? funcBody ;
 funcName : Ident ;
@@ -79,7 +76,7 @@ funcTypeArgs : type (',' type)* ;
 funcTypeTail : '->' type ;
 
 expr
-    : '@'? (IntLiteral | StringLiteral | CharLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr initExpr? | initExpr)*
+    : (IntLiteral | StringLiteral | CharLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr initExpr? | initExpr)*
     | initExpr
     ;
 

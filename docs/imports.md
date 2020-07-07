@@ -27,6 +27,24 @@ def function = b::function();
 
 By default all symbols are exported from a CU.
 
+## Re-exporting CUs
+
+External CUs are not re-exported.
+
+```ct
+# a.ct
+
+# contains function()
+import other;
+```
+
+```ct
+# b.ct
+
+# invalid: `other` is not visible outside of `a`
+# import a::other;
+```
+
 ## Import Specifier
 
 Importing items from a CU using an import specifier limits the amount of symbols imported and removes the need to specify the module name. The same symbol may not be imported multiple times from the same CU and clashing symbols from multiple CUs is IDB.
