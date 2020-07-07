@@ -122,11 +122,92 @@ static void dumpAlias(CtAST* alias)
     printf(";");
 }
 
+static void dumpExpr(CtAST* expr)
+{
+    (void)expr;
+}
+
+static void dumpArg(CtAST* arg)
+{
+    dumpIdent(arg->data.arg.name);
+    printf(": ");
+    dumpType(arg->data.arg.type);
+
+    if (arg->data.arg.init)
+    {
+        printf(" = ");
+        dumpExpr(arg->data.arg.init);
+    }
+}
+
+static void dumpArgs(CtASTList* args)
+{
+    while (1)
+    {
+        dumpArg(args->item);
+        args = args->next;
+        if (!args)
+            break;
+
+        printf(", ");
+    }
+}
+
+static void dumpStmt(CtAST* stmt);
+
+static void dumpStmtList(CtASTList* list)
+{
+    printf("{");
+
+    while (1)
+    {
+        dumpStmt(list->item);
+        list = list->next;
+        if (!list)
+            break;
+    }
+
+    printf("}");
+}
+
+static void dumpStmt(CtAST* stmt)
+{
+    (void)stmt;
+}
+
+static void dumpFunc(CtAST* func)
+{
+    CtFunction fun = func->data.func;
+    printf("def ");
+    dumpIdent(fun.name);
+
+    printf("(");
+    if (fun.args)
+        dumpArgs(fun.args);
+    printf(")");
+
+    printf(" -> ");
+
+    if (fun.result)
+        dumpType(fun.result);
+    else
+        printf("void");
+
+    if (fun.body)
+        dumpStmt(fun.body);
+    else
+        printf(";");
+}
+
 static void dumpBody(CtAST* item)
 {
     if (item->kind == AK_ALIAS)
     {
         dumpAlias(item);
+    }
+    else if (item->kind == AK_FUNCTION)
+    {
+        dumpFunc(item);
     }
 }
 

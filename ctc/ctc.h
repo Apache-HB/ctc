@@ -132,7 +132,12 @@ typedef enum {
     AK_TYPENAME,
     AK_POINTER,
     AK_REFERENCE,
-    AK_FUNCPTR
+    AK_FUNCPTR,
+    AK_FUNCTION,
+
+    AK_ARGUMENT,
+
+    AK_STMTLIST
 } CtASTKind;
 
 typedef struct CtASTList {
@@ -173,6 +178,19 @@ typedef struct {
     struct CtAST* result;
 } CtFuncptr;
 
+typedef struct {
+    struct CtAST* name;
+    CtASTList* args;
+    struct CtAST* result;
+    struct CtAST* body;
+} CtFunction;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+    struct CtAST* init;
+} CtASTArg;
+
 typedef union {
     CtASTUnit unit;
     CtASTImport import;
@@ -182,6 +200,9 @@ typedef union {
     struct CtAST* ptr;
     struct CtAST* ref;
     CtFuncptr funcptr;
+    CtFunction func;
+    CtASTArg arg;
+    CtASTList* list;
 } CtASTData;
 
 typedef struct CtAST {

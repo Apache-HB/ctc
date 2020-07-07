@@ -44,7 +44,7 @@ varBody : ':' type | (':' type)? '=' expr ;
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' | funcDecl | aliasDecl ;
+stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' | funcDecl ;
 
 returnStmt : 'return' expr? ';' ;
 

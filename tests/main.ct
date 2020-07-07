@@ -11,3 +11,6 @@ alias ptr = *void;
 
 alias func = def(*********void, nuahjksgd, ashj, hjkasd::hjkasd) -> *void;
 alias ref = &aaa;
+
+def main(a: i8, b: i8) -> *void;
+def jeff;

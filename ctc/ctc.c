@@ -1036,6 +1036,234 @@ static CtAST* parseAlias(CtParser* self)
     return alias;
 }
 
+static CtAST* parseNameExpr(CtParser* self, CtToken tok)
+{
+    CtAST* name = astNew(AK_IDENT);
+    CtASTList* parts = astListNew(NULL);
+    CtASTList* tail;
+
+    name->tok = tok;
+    tail = astListAdd(parts, name);
+
+    while (parseConsumeKey(self, K_COLON2))
+    {
+        tail = astListAdd(tail, parseExpectIdent(self));
+    }
+
+    name = astNew(AK_NAME);
+    name->data.name = parts;
+
+    return name;
+}
+
+static CtAST* parseExpr(CtParser* self)
+{
+    CtAST* expr;
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_IDENT)
+    {
+        expr = parseNameExpr(self, tok);
+        /* ident */
+        /* ident::ident */
+    }
+    else if (tok.kind == TK_STRING)
+    {
+        expr = astNew(AK_STRING);
+        expr->tok = tok;
+    }
+    else if (tok.kind == TK_INT)
+    {
+        expr = astNew(AK_INT);
+        expr->tok = tok;
+    }
+    else if (tok.kind == TK_KEYWORD)
+    {
+        expr = parseUnaryExpr(self, tok);
+    }
+    else
+    {
+        /* error */
+    }
+
+    /* expr op expr */
+    while (1)
+    {
+        tok = parseNext(self);
+
+        if (tok.kind == TK_KEYWORD)
+        {
+            expr = parseExprTail(self, expr, tok);
+        }
+        else
+        {
+            self->tok = tok;
+            break;
+        }
+    }
+
+    return expr;
+}
+
+static CtAST* parseStmtList(CtParser* self);
+
+static CtAST* parseStmt(CtParser* self)
+{
+    CtAST* stmt;
+
+    if (parseConsumeKey(self, K_RETURN))
+    {
+        stmt = parseReturnStmt(self);
+    }
+    else if (parseConsumeKey(self, K_IF))
+    {
+        stmt = parseIfStmt(self);
+    }
+    else if (parseConsumeKey(self, K_FOR))
+    {
+        stmt = parseForStmt(self);
+    }
+    else if (parseConsumeKey(self, K_WHILE))
+    {
+        stmt = parseWhileStmt(self);
+    }
+    else if (parseConsumeKey(self, K_SEMI))
+    {
+        stmt = NULL;
+    }
+    else if (parseConsumeKey(self, K_VAR))
+    {
+        stmt = parseVar(self);
+    }
+    else if (parseConsumeKey(self, K_ALIAS))
+    {
+        stmt = parseAlias(self);
+    }
+    else if (parseConsumeKey(self, K_DEF))
+    {
+        stmt = parseFunc(self);
+    }
+    else if (parseConsumeKey(self, K_LBRACE))
+    {
+        stmt = parseStmtList(self);
+    }
+    else
+    {
+        stmt = parseExpr(self);
+        parseExpectKey(self, K_SEMI);
+    }
+
+    return stmt;
+}
+
+static CtAST* parseStmtList(CtParser* self)
+{
+    CtAST* list;
+    CtASTList* stmts;
+    CtASTList* tail;
+
+    stmts = astListNew(NULL);
+    tail = stmts;
+
+    while (!parseConsumeKey(self, K_RBRACE))
+    {
+        tail = astListAdd(tail, parseStmt(self));
+    }
+
+    list = astNew(AK_STMTLIST);
+    list->data.list = stmts;
+
+    return list;
+}
+
+static CtAST* parseFuncArg(CtParser* self, int* assigned)
+{
+    CtAST* arg;
+    CtAST* name;
+    CtAST* type;
+    CtAST* init;
+
+    name = parseExpectIdent(self);
+
+    parseExpectKey(self, K_COLON);
+
+    type = parseType(self);
+
+    if (parseConsumeKey(self, K_ASSIGN))
+    {
+        *assigned = 1;
+        init = parseExpr(self);
+    }
+    else
+    {
+        if (*assigned)
+        {
+            /* error */
+        }
+
+        init = NULL;
+    }
+
+    arg = astNew(AK_ARGUMENT);
+    arg->data.arg.name = name;
+    arg->data.arg.type = type;
+    arg->data.arg.init = init;
+
+    return arg;
+}
+
+static CtASTList* parseFuncArgs(CtParser* self)
+{
+    CtASTList* args;
+    CtASTList* tail;
+    int assigned = 0;
+
+    if (parseConsumeKey(self, K_RPAREN))
+    {
+        args = NULL;
+    }
+    else
+    {
+        args = astListNew(parseFuncArg(self, &assigned));
+        tail = args;
+
+        while (parseConsumeKey(self, K_COMMA))
+        {
+            tail = astListAdd(tail, parseFuncArg(self, &assigned));
+        }
+
+        parseExpectKey(self, K_RPAREN);
+    }
+
+    return args;
+}
+
+static CtAST* parseFuncBody(CtParser* self)
+{
+    CtAST* body;
+
+    if (parseConsumeKey(self, K_SEMI))
+    {
+        body = NULL;
+    }
+    else if (parseConsumeKey(self, K_ASSIGN))
+    {
+        body = parseExpr(self);
+        parseExpectKey(self, K_SEMI);
+    }
+    else if (parseConsumeKey(self, K_LBRACE))
+    {
+        body = parseStmtList(self);
+    }
+    else
+    {
+        body = NULL;
+        /* error */
+    }
+
+    return body;
+}
+
 static CtAST* parseFunc(CtParser* self)
 {
     CtAST* name;
@@ -1043,6 +1271,37 @@ static CtAST* parseFunc(CtParser* self)
     CtAST* result;
     CtAST* body;
     CtAST* func;
+
+    /* TODO: will need to support name::member */
+    name = parseExpectIdent(self);
+
+    if (parseConsumeKey(self, K_LPAREN))
+    {
+        args = parseFuncArgs(self);
+    }
+    else
+    {
+        args = NULL;
+    }
+
+    if (parseConsumeKey(self, K_ARROW))
+    {
+        result = parseType(self);
+    }
+    else
+    {
+        result = NULL;
+    }
+
+    body = parseFuncBody(self);
+
+    func = astNew(AK_FUNCTION);
+    func->data.func.name = name;
+    func->data.func.args = args;
+    func->data.func.result = result;
+    func->data.func.body = body;
+
+    return func;
 }
 
 static CtASTList* parseBody(CtParser* self)
