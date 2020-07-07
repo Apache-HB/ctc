@@ -22,7 +22,8 @@ structDecl : 'struct' Ident '{' structField* '}' ;
 unionField : Ident ':' type ';' ;
 unionDecl : 'union' Ident '{' unionField* '}' ;
 
-enumField : Ident ('=' expr)? ;
+enumData : '{' structField+ '}' ;
+enumField : Ident enumData? ('=' expr)? ;
 enumFields : enumField (',' enumField)* ;
 enumBacking : ':' type ;
 enumDecl : 'enum' Ident enumBacking? '{' enumFields? '}' ;

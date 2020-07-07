@@ -153,28 +153,6 @@ static void dumpArgs(CtASTList* args)
     }
 }
 
-static void dumpStmt(CtAST* stmt);
-
-static void dumpStmtList(CtASTList* list)
-{
-    printf("{");
-
-    while (1)
-    {
-        dumpStmt(list->item);
-        list = list->next;
-        if (!list)
-            break;
-    }
-
-    printf("}");
-}
-
-static void dumpStmt(CtAST* stmt)
-{
-    (void)stmt;
-}
-
 static void dumpFunc(CtAST* func)
 {
     CtFunction fun = func->data.func;
@@ -193,10 +171,31 @@ static void dumpFunc(CtAST* func)
     else
         printf("void");
 
+    /*
     if (fun.body)
         dumpStmt(fun.body);
-    else
+
+    else*/
         printf(";");
+}
+
+static void dumpField(CtAST* field)
+{
+    dumpIdent(field->data.field.name);
+    printf(": ");
+    dumpType(field->data.field.type);
+    printf(";");
+}
+
+static void dumpStruct(CtAST* struc)
+{
+    printf("struct ");
+    dumpIdent(struc->data.struc.name);
+    printf(" {");
+
+    dumpList(struc->data.struc.fields, dumpField, "");
+
+    printf("}");
 }
 
 static void dumpBody(CtAST* item)
@@ -209,6 +208,10 @@ static void dumpBody(CtAST* item)
     {
         dumpFunc(item);
     }
+    else if (item->kind == AK_STRUCT)
+    {
+        dumpStruct(item);
+    }
 }
 
 static void dumpList(CtASTList* list, void(*func)(CtAST*), const char* sep)
@@ -216,6 +219,9 @@ static void dumpList(CtASTList* list, void(*func)(CtAST*), const char* sep)
     (void)dumpBody;
     while (1)
     {
+        if (!list->item)
+            break;
+
         func(list->item);
 
         if (list->next)

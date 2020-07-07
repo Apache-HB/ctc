@@ -127,6 +127,7 @@ typedef enum {
     AK_IDENT,
 
     AK_ALIAS,
+    AK_STRUCT,
 
     AK_BUILTIN,
     AK_TYPENAME,
@@ -137,7 +138,8 @@ typedef enum {
 
     AK_ARGUMENT,
 
-    AK_STMTLIST
+    AK_FIELD,
+    AK_ENUM_FIELD
 } CtASTKind;
 
 typedef struct CtASTList {
@@ -191,6 +193,22 @@ typedef struct {
     struct CtAST* init;
 } CtASTArg;
 
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+} CtASTField;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTList* fields;
+} CtASTStruct;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTList* data;
+    struct CtAST* val;
+} CtASTEnumField;
+
 typedef union {
     CtASTUnit unit;
     CtASTImport import;
@@ -203,6 +221,10 @@ typedef union {
     CtFunction func;
     CtASTArg arg;
     CtASTList* list;
+
+    CtASTEnumField efield;
+    CtASTStruct struc;
+    CtASTField field;
 } CtASTData;
 
 typedef struct CtAST {

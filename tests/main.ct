@@ -14,3 +14,15 @@ alias ref = &aaa;
 
 def main(a: i8, b: i8) -> *void;
 def jeff;
+
+struct name {}
+
+struct honk {
+    a: honk;
+}
+
+struct honk2 {
+    a: ****ptr;
+    b: int;
+    c: hjhj;
+}
