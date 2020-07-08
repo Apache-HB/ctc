@@ -885,7 +885,7 @@ static CtASTList astListNew(CtAST* init)
     list.alloc = 8;
     list.items = CT_MALLOC(sizeof(CtAST) * 8);
 
-    if (init)
+    if (!init)
     {
         list.len = 0;
     }
@@ -900,11 +900,11 @@ static CtASTList astListNew(CtAST* init)
 
 static void astListAdd(CtASTList* self, CtAST* node)
 {
-    if (self->len + 1 >= self->alloc)
+    if (self->len >= self->alloc)
     {
         self->alloc += 8;
         CtAST* temp = CT_MALLOC(sizeof(CtAST) * self->alloc);
-        memcpy(temp, self->items, self->len);
+        memcpy(temp, self->items, self->len * sizeof(CtAST));
         CT_FREE(self->items);
         self->items = temp;
     }
@@ -946,10 +946,19 @@ static CtAST* parseTypeName(CtParser* self)
 static CtAST* parseArrayType(CtParser* self)
 {
     CtAST* type = parseType(self);
+    CtAST* size;
 
-    parseExpectKey(self, K_COLON);
+    /* TODO: distinguish between no size and var size */
+    if (parseConsumeKey(self, K_COLON))
+    {
+        size = parseConsumeKey(self, K_VAR) ? NULL : parseExpr(self);
+    }
+    else
+    {
+        size = NULL;
+    }
 
-    CtAST* size = parseConsumeKey(self, K_VAR) ? NULL : parseExpr(self);
+    parseExpectKey(self, K_RSQUARE);
 
     CtAST* node = astNew(AK_ARRAY);
     node->data.arr.type = type;
@@ -1032,6 +1041,8 @@ static CtAST* parseAlias(CtParser* self)
     parseExpectKey(self, K_ASSIGN);
 
     data.symbol = parseAliasBody(self);
+
+    parseExpectKey(self, K_SEMI);
 
     node->data.alias = data;
 
@@ -1189,6 +1200,7 @@ CtAST* ctParseNext(CtParser* self)
     }
     else
     {
+        printf("how did we get here\n");
         return NULL;
     }
 }

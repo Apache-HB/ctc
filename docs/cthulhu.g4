@@ -69,7 +69,7 @@ type
 nameType : Ident ('::' Ident)* ;
 ptrType : '*' type ;
 refType : '&' type ;
-arrayType : '[' type ':' arrayTypeBody ']' ;
+arrayType : '[' type (':' arrayTypeBody)? ']' ;
 arrayTypeBody : 'var' | expr ;
 funcType : 'def' '(' funcTypeArgs? ')' funcTypeTail? ;
 funcTypeArgs : type (',' type)* ;

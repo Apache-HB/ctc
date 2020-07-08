@@ -8,7 +8,8 @@ CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-I. \
 	-mno-x87 \
 	-fno-threadsafe-statics \
-	-ffreestanding
+	-ffreestanding \
+	-Wno-missing-prototypes
 
 setup:
 	mkdir -p build
