@@ -1183,6 +1183,10 @@ CtAST* ctParseNext(CtParser* self)
     {
         return parseAlias(self);
     }
+    else if (parseConsumeKey(self, K_IMPORT))
+    {
+        return parseImport(self);
+    }
     else
     {
         return NULL;

@@ -21,7 +21,10 @@ int main(int argc, const char** argv)
 
     while (1)
     {
-        CtToken tok = ctLexNext(lex);
+        CtAST* node = ctParseNext(parse);
+        if (!node)
+            break;
+        /*CtToken tok = ctLexNext(lex);
 
         char* str = tokStr(tok);
         puts(str);
@@ -30,7 +33,7 @@ int main(int argc, const char** argv)
         CT_FREE(str);
 
         if (tok.kind == TK_ERROR || tok.kind == TK_EOF)
-            break;
+            break;*/
     }
 
     ctParseClose(parse);
