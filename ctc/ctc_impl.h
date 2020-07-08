@@ -846,15 +846,31 @@ static int parseConsumeKey(CtParser* self, CtKeyword key)
     return 0;
 }
 
-static void parseExpectKey(CtParser* self, CtKeyword key)
+/**
+ * if (parseExpectKey(self, key))
+ * {
+ *     // proper parsing
+ * }
+ * else
+ * {
+ *    // handle error
+ * }
+ */
+static int parseExpectKey(CtParser* self, CtKeyword key)
 {
     CtToken tok = parseNext(self);
 
     if (tok.kind != TK_KEYWORD || tok.data.key != key)
     {
+        printf("oh no\n");
         /* TODO: error */
+        return 0;
     }
+
+    return 1;
 }
+
+#define PARSE_EXPECT(self, key)
 
 static CtAST* parseExpectIdent(CtParser* self)
 {
@@ -985,9 +1001,13 @@ static CtAST* parseReferenceType(CtParser* self)
 
 static CtAST* parseClosureType(CtParser* self)
 {
-    parseExpectKey(self, K_LPAREN);
+    if(!parseExpectKey(self, K_LPAREN))
+        return NULL;
+
     CtASTList args = parseCollect(self, parseType, K_COMMA);
-    parseExpectKey(self, K_RPAREN);
+    
+    if(!parseExpectKey(self, K_RPAREN))
+        return NULL;
 
     CtAST* result = parseConsumeKey(self, K_ARROW) ? NULL : parseType(self);
 

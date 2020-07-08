@@ -61,7 +61,7 @@ static void writeImport(CtASTImport node)
     printf("import ");
     writeName(node.path);
 
-    if (node.items.len)
+    if (node.items.items)
     {
         printf("(");
         writeItems(node.items, ", ");
