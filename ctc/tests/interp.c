@@ -36,4 +36,6 @@ int main(int argc, const char** argv)
     ctParseClose(parse);
     ctLexClose(lex);
     ctStreamClose(stream);
+
+    return 0;
 }

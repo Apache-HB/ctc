@@ -6,7 +6,9 @@ CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-DPRINTF_DISABLE_SUPPORT_LONG_LONG \
 	-DPRINTF_DISABLE_SUPPORT_FLOAT \
 	-I. \
-	-mno-x87
+	-mno-x87 \
+	-fno-threadsafe-statics \
+	-ffreestanding
 
 setup:
 	mkdir -p build

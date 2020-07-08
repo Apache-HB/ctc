@@ -139,9 +139,6 @@ typedef struct {
 typedef struct {
     CtStream* stream;
     char* err;
-
-    /* reused buffer */
-    CtBuffer reuse;
 } CtLexer;
 
 /* open a lexing stream */
@@ -164,16 +161,76 @@ CtParser* ctParseOpen(CtLexer* source);
 
 void ctParseClose(CtParser* self);
 
+typedef struct {
+    struct CtAST* items;
+    size_t len;
+    size_t alloc;
+} CtASTList;
+
 typedef enum {
     AK_UNIT,
-    AK_IMPORT,
+
+    /* basic stuff */
+    AK_ERROR,
     AK_IDENT,
 
+    /* types */
+    AK_NAME,
+    AK_POINTER,
+    AK_REFERENCE,
+    AK_ARRAY,
+    AK_CLOSURE,
+
+    /* declarations */
     AK_ALIAS,
+    AK_IMPORT,
 } CtASTKind;
 
+typedef struct {
+    struct CtAST* name;
+    /* can be AK_IDENT, AK_TYPE */
+    struct CtAST* symbol;
+} CtASTAlias;
+
+typedef struct {
+    CtASTList path;
+    CtASTList items;
+} CtASTImport;
+
+typedef struct {
+    struct CtAST* type;
+    struct CtAST* size;
+} CtASTArray;
+
+typedef struct {
+    CtASTList args;
+    struct CtAST* result;
+} CtASTClosure;
+
 typedef union {
-    void* TODO;
+    /* AK_ERROR */
+    char* reason;
+
+    /* AK_NAME */
+    CtASTList name;
+
+    /* AK_POINTER */
+    struct CtAST* ptr;
+
+    /* AK_REFERENCE */
+    struct CtAST* ref;
+
+    /* AK_ARRAY */
+    CtASTArray arr;
+
+    /* AK_CLOSURE */
+    CtASTClosure closure;
+
+    /* AK_IMPORT */
+    CtASTImport import;
+
+    /* AK_ALIAS */
+    CtASTAlias alias;
 } CtASTData;
 
 typedef struct CtAST {
@@ -181,8 +238,6 @@ typedef struct CtAST {
     CtASTKind kind;
     CtASTData data;
 } CtAST;
-
-
 
 /* parse a single item using the `interp` rule in cthulhu.g4 */
 CtAST* ctParseNext(CtParser* self);

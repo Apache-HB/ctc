@@ -67,7 +67,6 @@ static char* numStr(CtNumber num)
 {
     char* out;
 
-    printf("int %llu\n", num.digit);
     if (num.enc == NE_INT)
     {
         CT_FMT_ARGS(out, "%lu", num.digit)
@@ -113,9 +112,9 @@ static char* tokStr(CtToken tok)
     case TK_INT:
         num = numStr(tok.data.digit);
         if (tok.data.digit.suffix)
-            CT_FMT_ARGS(out, "integer: `%s%s`", num, tok.data.digit.suffix)
+            CT_FMT_ARGS(out, "integer: `%s%s` (%lu)", num, tok.data.digit.suffix, tok.data.digit.digit)
         else
-            CT_FMT_ARGS(out, "integer: `%s`", num)
+            CT_FMT_ARGS(out, "integer: `%s` (%lu)", num, tok.data.digit.digit)
 
         if (num)
             CT_FREE(num);
@@ -197,13 +196,6 @@ static void bufPush(CtBuffer* self, char c)
     self->ptr[self->len++] = c;
     self->ptr[self->len] = '\0';
 }
-
-static void bufReset(CtBuffer* self)
-{
-    self->len = 0;
-    self->ptr[0] = 0;
-}
-
 
 /**
  * lexer internals
@@ -625,35 +617,37 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
     }
 }
 
-
-static CtDigit lexInt(CtLexer* self, int base)
-{
-    return 0;
-}
-
 /* base 16 integer */
 static CtDigit lexHexDigit(CtLexer* self)
 {
+    int i = 0;
     int c;
-    CtDigit out;
+    CtDigit out = 0;
     streamNext(self->stream);
 
     while (1)
     {
         c = streamPeek(self->stream);
+
         if (isxdigit(c))
         {
-            bufPush(&self->reuse, (char)streamNext(self->stream));
+            uint8_t n = (uint8_t)c;
+            uint64_t v = (n & 0xF) + (n >> 6) | ((n >> 3) & 0x8);
+            out = (out << 4) | (uint64_t)v;
+
+            if (i++ > 16)
+            {
+                CT_FMT(self->err, "integer overflow")
+                break;
+            }
         }
         else
         {
             break;
         }
-    }
 
-    out = lexInt(self, 16);
-    //out = strtoul(self->reuse.ptr, NULL, 16);
-    bufReset(&self->reuse);
+        streamNext(self->stream);
+    }
 
     return out;
 }
@@ -661,8 +655,9 @@ static CtDigit lexHexDigit(CtLexer* self)
 /* base 2 integer */
 static CtDigit lexBinDigit(CtLexer* self)
 {
+    int i = 0;
     int c;
-    CtDigit out;
+    CtDigit out = 0;
     streamNext(self->stream);
 
     while (1)
@@ -670,17 +665,23 @@ static CtDigit lexBinDigit(CtLexer* self)
         c = streamPeek(self->stream);
         if (c == '0' || c == '1')
         {
-            bufPush(&self->reuse, (char)streamNext(self->stream));
+            out *= 2;
+            if (c == '1')
+                out += 1;
+
+            streamNext(self->stream);
+
+            if (i++ > 64)
+            {
+                CT_FMT(self->err, "integer overflow")
+                break;
+            }
         }
         else
         {
             break;
         }
     }
-
-    out = lexInt(self, 2);
-    //out = strtoul(self->reuse.ptr, NULL, 2);
-    bufReset(&self->reuse);
 
     return out;
 }
@@ -688,25 +689,28 @@ static CtDigit lexBinDigit(CtLexer* self)
 /* base 10 integer */
 static CtDigit lexDigit1(CtLexer* self, int c)
 {
-    CtDigit out;
-    bufPush(&self->reuse, (char)c);
+    int i = 0;
+    CtDigit out = 0;
 
     while (1)
     {
         c = streamPeek(self->stream);
         if (isdigit(c))
         {
-            bufPush(&self->reuse, (char)streamNext(self->stream));
+            out *= (10 + ((uint8_t)c - '0'));
+            streamNext(self->stream);
+
+            if (i++ > 22)
+            {
+                CT_FMT(self->err, "integer overflow")
+                break;
+            }
         }
         else
         {
             break;
         }
     }
-
-    out = lexInt(self, 10);
-    //out = strtoul(self->reuse.ptr, NULL, 10);
-    bufReset(&self->reuse);
 
     return out;
 }
@@ -779,7 +783,8 @@ static CtNumber lexDigit(CtLexer* self, int c)
         num.digit = lexDigit1(self, c);
     }
 
-    if (isident1(streamPeek(self->stream)))
+    /* check for self->err here to prevent memory leaks */
+    if (isident1(streamPeek(self->stream)) && !self->err)
     {
         /* we have a digit suffix */
         lexIdent(self, &suffix, '\0');
@@ -807,6 +812,13 @@ static CtNumber lexDigit(CtLexer* self, int c)
 /**
  * parser internals
  */
+
+static CtAST* astNew(CtASTKind kind)
+{
+    CtAST* self = CT_MALLOC(sizeof(CtAST));
+    self->kind = kind;
+    return self;
+}
 
 static CtToken parseNext(CtParser* self)
 {
@@ -846,20 +858,184 @@ static void parseExpectKey(CtParser* self, CtKeyword key)
 
 static CtAST* parseExpectIdent(CtParser* self)
 {
-    (void)self;
+    CtAST* out;
+    CtToken tok = parseNext(self);
 
-    return NULL;
-    //CtAST* out = astNew(AK_IDENT);
-    //CtToken tok = parseNext(self);
-
-    //if (tok.kind != TK_IDENT)
+    if (tok.kind == TK_IDENT)
     {
-        /* TODO: error */
+        out = astNew(AK_IDENT);
+        out->tok = tok;
+    }
+    else
+    {
+        out = astNew(AK_ERROR);
+        out->tok = tok;
+
+        char* str = tokStr(tok);
+        CT_FMT_ARGS(out->data.reason, "expected identifier but found %s instead", str)
+        CT_FREE(str);
     }
 
-    //out->tok = tok;
+    return out;
+}
 
-    //return out;
+static CtASTList astListNew(CtAST* init)
+{
+    CtASTList list;
+    list.alloc = 8;
+    list.items = CT_MALLOC(sizeof(CtAST) * 8);
+
+    if (init)
+    {
+        list.len = 0;
+    }
+    else
+    {
+        list.len = 1;
+        memcpy(list.items, init, sizeof(CtAST));
+    }
+
+    return list;
+}
+
+static void astListAdd(CtASTList* self, CtAST* node)
+{
+    if (self->len + 1 >= self->alloc)
+    {
+        self->alloc += 8;
+        CtAST* temp = CT_MALLOC(sizeof(CtAST) * self->alloc);
+        memcpy(temp, self->items, self->len);
+        CT_FREE(self->items);
+        self->items = temp;
+    }
+
+    self->items[self->len++] = *node;
+}
+
+static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep)
+{
+    CtASTList parts = astListNew(func(self));
+
+    while (parseConsumeKey(self, sep))
+    {
+        astListAdd(&parts, func(self));
+    }
+
+    return parts;
+}
+
+static CtAST* parseType(CtParser* self);
+
+static CtAST* parseExpr(CtParser* self)
+{
+    (void)self;
+    return NULL;
+}
+
+static CtAST* parseTypeName(CtParser* self)
+{
+    /* matches ident (`::` ident)* */
+    CtASTList parts = parseCollect(self, parseExpectIdent, K_COLON2);
+    CtAST* out = astNew(AK_NAME);
+
+    out->data.name = parts;
+
+    return out;
+}
+
+static CtAST* parseArrayType(CtParser* self)
+{
+    CtAST* type = parseType(self);
+
+    parseExpectKey(self, K_COLON);
+
+    CtAST* size = parseConsumeKey(self, K_VAR) ? NULL : parseExpr(self);
+
+    CtAST* node = astNew(AK_ARRAY);
+    node->data.arr.type = type;
+    node->data.arr.size = size;
+
+    return node;
+}
+
+static CtAST* parsePointerType(CtParser* self)
+{
+    CtAST* node = astNew(AK_POINTER);
+    node->data.ptr = parseType(self);
+
+    return node;
+}
+
+static CtAST* parseReferenceType(CtParser* self)
+{
+    CtAST* node = astNew(AK_REFERENCE);
+    node->data.ref = parseType(self);
+
+    return node;
+}
+
+static CtAST* parseClosureType(CtParser* self)
+{
+    parseExpectKey(self, K_LPAREN);
+    CtASTList args = parseCollect(self, parseType, K_COMMA);
+    parseExpectKey(self, K_RPAREN);
+
+    CtAST* result = parseConsumeKey(self, K_ARROW) ? NULL : parseType(self);
+
+    CtAST* node = astNew(AK_CLOSURE);
+    node->data.closure.args = args;
+    node->data.closure.result = result;
+
+    return node;
+}
+
+static CtAST* parseType(CtParser* self)
+{
+    if (parseConsumeKey(self, K_LSQUARE))
+    {
+        return parseArrayType(self);
+    }
+    else if (parseConsumeKey(self, K_MUL))
+    {
+        return parsePointerType(self);
+    }
+    else if (parseConsumeKey(self, K_BITAND))
+    {
+        return parseReferenceType(self);
+    }
+    else if (parseConsumeKey(self, K_DEF))
+    {
+        return parseClosureType(self);
+    }
+    else
+    {
+        return parseTypeName(self);
+    }
+}
+
+static CtAST* parseAliasBody(CtParser* self)
+{
+    CtAST* node;
+
+    node = parseType(self);
+
+    return node;
+}
+
+static CtAST* parseAlias(CtParser* self)
+{
+    CtAST* node = astNew(AK_ALIAS);
+    CtASTAlias data;
+
+    data.name = parseExpectIdent(self);
+
+    parseExpectKey(self, K_ASSIGN);
+
+    data.symbol = parseAliasBody(self);
+
+    node->data.alias = data;
+
+    return node;
 }
 
 /**
@@ -901,14 +1077,12 @@ CtLexer* ctLexOpen(CtStream* stream)
     CtLexer* self = CT_MALLOC(sizeof(CtLexer));
     self->stream = stream;
     self->err = NULL;
-    self->reuse = bufNew(64);
 
     return self;
 }
 
 void ctLexClose(CtLexer* self)
 {
-    CT_FREE(self->reuse.ptr);
     CT_FREE(self);
 }
 
@@ -980,11 +1154,14 @@ void ctParseClose(CtParser* self)
 
 CtAST* ctParseNext(CtParser* self)
 {
-    (void)parseConsumeKey;
-    (void)parseExpectKey;
-    (void)parseExpectIdent;
-    (void)self;
-    return NULL;
+    if (parseConsumeKey(self, K_ALIAS))
+    {
+        return parseAlias(self);
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 CtAST* ctParseUnit(CtParser* self)
