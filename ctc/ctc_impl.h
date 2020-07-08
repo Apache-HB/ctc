@@ -1038,6 +1038,31 @@ static CtAST* parseAlias(CtParser* self)
     return node;
 }
 
+static CtAST* parseImport(CtParser* self)
+{
+    CtASTList path = parseCollect(self, parseExpectIdent, K_COLON2);
+
+    CtASTList items;
+
+    if (parseConsumeKey(self, K_LPAREN))
+    {
+        items = parseCollect(self, parseExpectIdent, K_COMMA);
+        parseExpectKey(self, K_RPAREN);
+    }
+    else
+    {
+        items.items = NULL;
+    }
+
+    parseExpectKey(self, K_SEMI);
+
+    CtAST* node = astNew(AK_IMPORT);
+    node->data.import.path = path;
+    node->data.import.items = items;
+
+    return node;
+}
+
 /**
  * public api
  */
