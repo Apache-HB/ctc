@@ -199,6 +199,7 @@ typedef enum {
 
     /* expressions */
     AK_LITERAL,
+    AK_UNARY,
     AL_CALL,
     AK_NAME,
 
@@ -356,6 +357,9 @@ typedef union {
 
     /* AK_VAR */
     CtASTVar var;
+
+    /* AK_UNARY */
+    struct CtAST* expr;
 } CtASTData;
 
 typedef struct CtAST {
@@ -369,5 +373,29 @@ CtAST* ctParseNext(CtParser* self);
 
 /* parse a full compilation unit using the `unit` rule in cthulhu.g4 */
 CtAST* ctParseUnit(CtParser* self);
+
+/* cleanup a node */
+void ctFreeAST(CtAST* node);
+
+typedef struct {
+    /* user provided data */
+    void* data;
+} CtInterpData;
+
+typedef struct CtSymbols {
+    /* all the symbols in the current scope */
+    CtASTList symbols;
+} CtSymbols;
+
+/* interpreter */
+typedef struct {
+    /* all the symbols currently available */
+    CtSymbols symbols;
+    CtInterpData userdata;
+} CtInterp;
+
+CtInterp* ctInterpOpen(CtInterpData data);
+void ctInterpEval(CtInterp* self, CtAST* ast);
+void ctInterpClose(CtInterp* self);
 
 #endif /* CTC_H */

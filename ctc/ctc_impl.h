@@ -5,7 +5,8 @@
 #include <stdarg.h>
 
 /**
- * config data
+ * config stuff
+ * substitute these functions as needed
  */
 
 #include <stdlib.h>
@@ -883,8 +884,6 @@ static int parseExpectKey(CtParser* self, CtKeyword key)
     return 1;
 }
 
-#define PARSE_EXPECT(self, key)
-
 static CtAST* parseExpectIdent(CtParser* self)
 {
     CtAST* out;
@@ -954,11 +953,78 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
 }
 
 static CtAST* parseType(CtParser* self);
+static CtAST* parseExpr(CtParser* self);
+
+static CtAST* parseInfixExpr(CtParser* self, CtToken tok)
+{
+    CtAST* node = astNew(AK_UNARY);
+    node->tok = tok;
+
+    switch (tok.data.key)
+    {
+    case K_LPAREN:
+        /* (expr) */
+        node->data.expr = parseExpr(self);
+        parseExpectKey(self, K_RPAREN);
+        break;
+    case K_ADD:
+        /* +expr */
+    case K_SUB:
+        /* -expr */
+    case K_NOT:
+        /* !expr */
+    case K_MUL:
+        /* *expr */
+    case K_BITAND:
+        /* &expr */
+    case K_BITNOT:
+        /* ~expr */
+        node->data.expr = parseExpr(self);
+        break;
+    default:
+        node->data.expr = NULL;
+        /* TODO: error */
+        break;
+    }
+
+    return node;
+}
+
+static CtAST* parseNameExpr(CtParser* self, CtToken tok)
+{
+    (void)self;
+    /* TODO: handle name::expr */
+    CtAST* name = astNew(AK_NAME);
+    name->tok = tok;
+    return name;
+}
 
 static CtAST* parseExpr(CtParser* self)
 {
-    (void)self;
-    return NULL;
+    CtToken tok = parseNext(self);
+    CtAST* node;
+
+    if (tok.kind == TK_INT || tok.kind == TK_STRING || tok.kind == TK_CHAR)
+    {
+        node = astNew(AK_LITERAL);
+        node->tok = tok;
+    }
+    else if (tok.kind == TK_IDENT)
+    {
+        node = parseNameExpr(self, tok);
+    }
+    else if (tok.kind == TK_KEYWORD)
+    {
+        node = parseInfixExpr(self, tok);
+    }
+    else
+    {
+        node = NULL;
+    }
+
+    /* TODO: postifx stuff */
+
+    return node;
 }
 
 static CtAST* parseStmt(CtParser* self)
@@ -1257,7 +1323,6 @@ static CtAST* parseFunctionArg(CtParser* self)
 static CtASTList parseFunctionArgs(CtParser* self)
 {
     CtASTList args;
-    int default_arg = 0;
     if (parseConsumeKey(self, K_RPAREN))
     {
         args.items = NULL;
@@ -1268,7 +1333,7 @@ static CtASTList parseFunctionArgs(CtParser* self)
 
         while (parseConsumeKey(self, K_COMMA))
         {
-            astListAdd(&args, parseFunctionArg(self, &default_arg));
+            astListAdd(&args, parseFunctionArg(self));
         }
 
         parseExpectKey(self, K_RPAREN);
@@ -1555,4 +1620,28 @@ CtAST* ctParseUnit(CtParser* self)
     node->data.unit.symbols = symbols;
 
     return node;
+}
+
+void ctFreeAST(CtAST* node)
+{
+    tokFree(node->tok);
+}
+
+CtInterp* ctInterpOpen(CtInterpData data)
+{   
+    CtInterp* self = CT_MALLOC(sizeof(CtInterp));
+    self->userdata = data;
+
+    return self;
+}
+
+void ctInterpEval(CtInterp* self, CtAST* node)
+{
+    (void)self;
+    (void)node;
+}
+
+void ctInterpClose(CtInterp* self)
+{
+    CT_FREE(self);
 }
