@@ -4,7 +4,7 @@ grammar cthulhu;
 unit : importDecl* bodyDecl* EOF ;
 
 // interpreting a file
-interp : (importDecl | bodyDecl)* EOF ;
+interp : (importDecl | bodyDecl | stmt)* EOF ;
 
 importDecl : 'import' importPath importSpec? ';' ;
 
@@ -21,7 +21,8 @@ field : Ident ':' type ';' ;
 structDecl : 'struct' Ident '{' field* '}' ;
 unionDecl : 'union' Ident '{' field* '}' ;
 
-enumField : Ident ('=' expr)? ;
+enumData : '{' field* '}' ;
+enumField : Ident enumData? ('=' expr)? ;
 enumFields : enumField (',' enumField)* ;
 enumDecl : 'enum' Ident (':' type)? '{' enumFields? '}' ;
 
@@ -35,9 +36,9 @@ defaultFuncArg : Ident ':' type '=' expr ;
 funcTail : '->' type ;
 funcBody : stmtList | '=' expr ';' | ';' ;
 
-varDecl : 'var' varNames varBody ';' ;
-varNames : Ident | '[' Ident (',' Ident)* ']' ;
-varBody : ':' type | (':' type)? '=' expr ;
+varDecl : 'var' varNames ('=' expr) ';' ;
+varName : Ident (':' type) ;
+varNames : varName | '[' varName (',' varName)* ']' ;
 
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
@@ -69,8 +70,7 @@ type
 nameType : Ident ('::' Ident)* ;
 ptrType : '*' type ;
 refType : '&' type ;
-arrayType : '[' type (':' arrayTypeBody)? ']' ;
-arrayTypeBody : 'var' | expr ;
+arrayType : '[' type (':' expr)? ']' ;
 funcType : 'def' '(' funcTypeArgs? ')' funcTypeTail? ;
 funcTypeArgs : type (',' type)* ;
 funcTypeTail : '->' type ;

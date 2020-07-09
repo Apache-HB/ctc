@@ -12,5 +12,34 @@ alias ptr = *void;
 alias func = def(*********void, nuahjksgd, ashj, hjkasd::hjkasd) -> *void;
 alias ref = &aaa;
 
-def main(a: i8, b: i8) -> *void;
-def jeff;
+alias arr = [void];
+alias asdasd = [void:10];
+
+struct a {
+    a: b;
+    c: d;
+}
+
+union b {
+    a: c;
+    d: e;
+}
+
+enum x {
+    a, b, c, d, e
+}
+
+enum x : u32 {
+    a, b, c, e, d, a
+}
+
+enum v : u32 {
+    a = 5,
+    b = 10,
+    c = 15
+}
+
+enum d {
+    a { a: u; b: c; } = 0,
+    c { d: u; } = 10
+}

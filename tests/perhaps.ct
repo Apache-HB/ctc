@@ -1,12 +1,19 @@
 # for things im not sure about
 
-# macros expand into expressions
-macro await<T> {
+def filter<T, F>(arr: vec<T>, func: F) -> vec<T> {
+    var out = vec<T>::new();
 
+    for item : arr
+        if (func(item))
+            out.add(item);
+
+    return out;
 }
 
-# trait for a struct, union or enum
-# but not a function
-trait debug<T: struct | union | enum> {
+def main {
+    var arr = vec<i32>::new(5, 6, 7, 8);
+    var num = 2;
 
+    # how should we handle lambda captures
+    filter(arr, def(i: i32) |num| -> bool = i == num);
 }

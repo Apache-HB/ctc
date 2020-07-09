@@ -1,4 +1,4 @@
-CC = clang
+CC = clang-10
 
 CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-Wno-padded -Wno-switch-enum -Wno-format-nonliteral \

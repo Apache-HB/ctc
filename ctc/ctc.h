@@ -174,8 +174,15 @@ typedef enum {
     AK_ERROR,
     AK_IDENT,
 
+    AK_FIELD,
+    AK_ENUM_FIELD,
+
+    AK_FUNC_ARG,
+    AK_VAR_NAME,
+    AK_ARG,
+
     /* types */
-    AK_NAME,
+    AK_TYPENAME,
     AK_POINTER,
     AK_REFERENCE,
     AK_ARRAY,
@@ -184,7 +191,25 @@ typedef enum {
     /* declarations */
     AK_ALIAS,
     AK_IMPORT,
+    AK_STRUCT,
+    AK_UNION,
+    AK_ENUM,
+    AK_FUNCTION,
+    AK_VAR,
+
+    /* expressions */
+    AK_LITERAL,
+    AL_CALL,
+    AK_NAME,
+
+    /* statements */
+    AK_STMTLIST
 } CtASTKind;
+
+typedef struct {
+    CtASTList imports;
+    CtASTList symbols;
+} CtASTUnit;
 
 typedef struct {
     struct CtAST* name;
@@ -207,7 +232,74 @@ typedef struct {
     struct CtAST* result;
 } CtASTClosure;
 
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+    CtASTList data;
+} CtASTField;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTList fields;
+} CtASTStruct;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTList fields;
+} CtASTUnion;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* val;
+    CtASTList data;
+} CtASTEnumField;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* backing;
+    CtASTList fields;
+} CtASTEnum;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* expr;
+} CtASTArg;
+
+typedef struct {
+    struct CtAST* func;
+    CtASTList args;
+} CtASTCall;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTList args;
+    struct CtAST* result;
+    struct CtAST* body;
+} CtASTFunction;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+    struct CtAST* init;
+} CtASTFuncArg;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+} CtASTVarName;
+
+typedef struct {
+    CtASTList names;
+    struct CtAST* init;
+} CtASTVar;
+
 typedef union {
+    /* AK_UNIT */
+    CtASTUnit unit;
+
+    /* AK_FIELD */
+    CtASTField field;
+
     /* AK_ERROR */
     char* reason;
 
@@ -231,6 +323,39 @@ typedef union {
 
     /* AK_ALIAS */
     CtASTAlias alias;
+
+    /* AK_STRUCT */
+    CtASTStruct struc;
+
+    /* AK_UNION */
+    CtASTUnion uni;
+
+    /* AK_ENUM */
+    CtASTEnum enu;
+
+    /* AK_ENUM_FIELD */
+    CtASTEnumField efield;
+
+    /* AK_FUNC_ARG */
+    CtASTFuncArg farg;
+
+    /* AK_FUNCTION */
+    CtASTFunction func;
+
+    /* AK_ARG */
+    CtASTArg arg;
+
+    /* AK_CALL */
+    CtASTCall call;
+
+    /* AK_STMTLIST */
+    CtASTList stmts;
+
+    /* AK_VAR_NAME */
+    CtASTVarName vname;
+
+    /* AK_VAR */
+    CtASTVar var;
 } CtASTData;
 
 typedef struct CtAST {
