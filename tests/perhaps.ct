@@ -14,7 +14,7 @@ def loop<T>(range: &const<vec<T>>) {
 def main {
     var [argc: u32, argv: *str] = rt::sys::args();
     var arg_vec = rt::vec<str>::new(argv, argc);
-    loop<vec<str>>(arg_vec);
+    loop<str>(arg_vec);
 }
 
 alias ivec = Vector<i32, :alloc = GlobalAlloc<i32>>;
