@@ -1113,18 +1113,26 @@ static CtASTList parseQualTypeArgs(CtParser* self)
     return args;
 }
 
-static CtAST* parseQualType(CtParser* self)
+static CtAST* parseQualTypeItem(CtParser* self)
 {
     CtAST* part = parseExpectIdent(self);
     CtASTList params = parseConsumeKey(self, K_LT) ? parseQualTypeArgs(self) : astListEmpty();
-    CtAST* next = parseConsumeKey(self, K_COLON2) ? parseQualType(self) : NULL;
 
     CtAST* qual = astNew(AK_QUAL_TYPE);
     qual->data.qual_type.name = part;
     qual->data.qual_type.params = params;
-    qual->data.qual_type.next = next;
 
     return qual;
+}
+
+static CtAST* parseQualType(CtParser* self)
+{
+    CtASTList parts = parseCollect(self, parseQualTypeItem, K_COLON2, K_INVALID);
+
+    CtAST* type = astNew(AK_TYPE);
+    type->data.type = parts;
+
+    return type;
 }
 
 static CtAST* parseType(CtParser* self)

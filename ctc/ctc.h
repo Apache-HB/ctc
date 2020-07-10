@@ -181,6 +181,7 @@ typedef enum {
     AK_FUNC_TYPE,
     AK_QUAL_TYPE,
     AK_TYPE_ARG,
+    AK_TYPE,
 
     /* expressions */
     AK_COERCE,
@@ -213,7 +214,6 @@ typedef struct {
 typedef struct {
     struct CtAST* name;
     CtASTList params;
-    struct CtAST* next;
 } CtASTQualType;
 
 typedef struct {
@@ -242,6 +242,10 @@ typedef union {
 
     /* AK_QUAL_TYPE */
     CtASTQualType qual_type;
+
+    /* AK_TYPE */
+    /* will be a list of CtASTQualType */
+    CtASTList type;
 
     /* AK_COERCE */
     CtASTCoerce coerce;
