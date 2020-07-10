@@ -988,6 +988,7 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
 
 static CtAST* parseExpr(CtParser* self);
 static CtAST* parseType(CtParser* self);
+static CtAST* parseQualType(CtParser* self);
 
 static CtAST* parseCoerceExpr(CtParser* self)
 {
