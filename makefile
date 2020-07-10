@@ -1,4 +1,4 @@
-CC = clang
+CC = clang-10
 
 CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-Wno-padded -Wno-switch-enum -Wno-format-nonliteral \
@@ -8,8 +8,7 @@ CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-I. \
 	-mno-x87 \
 	-fno-threadsafe-statics \
-	-ffreestanding \
-	-Wno-missing-prototypes
+	-ffreestanding
 
 setup:
 	mkdir -p build

@@ -1,19 +1,20 @@
 # for things im not sure about
 
-def filter<T, F>(arr: vec<T>, func: F) -> vec<T> {
-    var out = vec<T>::new();
+import std::rt;
+import std::traits(const);
+import std::types(char, u32);
 
-    for item : arr
-        if (func(item))
-            out.add(item);
+alias str = *const<char>;
 
-    return out;
+def loop<T>(range: &const<vec<T>>) {
+    for each <| range.iter()
+        rt::print(each.to_string());
 }
 
 def main {
-    var arr = vec<i32>::new(5, 6, 7, 8);
-    var num = 2;
-
-    # how should we handle lambda captures
-    filter(arr, def(i: i32) |num| -> bool = i == num);
+    var [argc: u32, argv: *str] = rt::sys::args();
+    var arg_vec = rt::vec<str>::new(argv, argc);
+    loop<vec<str>>(arg_vec);
 }
+
+alias ivec = Vector<i32, :alloc = GlobalAlloc<i32>>;

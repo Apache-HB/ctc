@@ -552,11 +552,20 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
             out->data.key = streamConsume(self->stream, '=') ? K_SHLEQ : K_SHL;
         else if (streamConsume(self->stream, '='))
             out->data.key = K_LTE;
+        else if (streamConsume(self->stream, '|')) /* the <| operator for streams */
+            out->data.key = K_STREAM;
         else
             out->data.key = K_LT;
         break;
     case '>':
-        if (streamConsume(self->stream, '>'))
+        /**
+         * we use self->depth here because templates require context
+         * sensitive lexing
+         *
+         * while this does mean that >>= becomes > >= instead of >> =
+         * thats hardly the end of the world
+         */
+        if (streamConsume(self->stream, '>') && !self->depth)
             out->data.key = streamConsume(self->stream, '=') ? K_SHREQ : K_SHR;
         else if (streamConsume(self->stream, '='))
             out->data.key = K_GTE;
@@ -860,6 +869,14 @@ static int parseExpect(CtParser* self, CtTokenKind kind)
     return 1;
 }
 
+static int parsePeek(CtParser* self, CtTokenKind kind)
+{
+    CtToken tok = parseNext(self);
+    self->tok = tok;
+
+    return tok.kind == kind;
+}
+
 /**
  * if (parseExpectKey(self, key))
  * {
@@ -926,6 +943,15 @@ static CtASTList astListNew(CtAST* init)
     return list;
 }
 
+static CtASTList astListEmpty()
+{
+    CtASTList list;
+    list.alloc = 0;
+    list.len = 0;
+    list.items = NULL;
+    return list;
+}
+
 static void astListAdd(CtASTList* self, CtAST* node)
 {
     if (self->len >= self->alloc)
@@ -940,8 +966,11 @@ static void astListAdd(CtASTList* self, CtAST* node)
     self->items[self->len++] = *node;
 }
 
-static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep)
+static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep, CtKeyword end)
 {
+    if (parseConsumeKey(self, end))
+        return astListEmpty();
+
     CtASTList parts = astListNew(func(self));
 
     while (parseConsumeKey(self, sep))
@@ -949,489 +978,162 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
         astListAdd(&parts, func(self));
     }
 
+    if (end != K_INVALID)
+        parseExpectKey(self, end);
+
     return parts;
 }
 
-static CtAST* parseType(CtParser* self);
-static CtAST* parseExpr(CtParser* self);
-
-static CtAST* parseInfixExpr(CtParser* self, CtToken tok)
-{
-    CtAST* node = astNew(AK_UNARY);
-    node->tok = tok;
-
-    switch (tok.data.key)
-    {
-    case K_LPAREN:
-        /* (expr) */
-        node->data.expr = parseExpr(self);
-        parseExpectKey(self, K_RPAREN);
-        break;
-    case K_ADD:
-        /* +expr */
-    case K_SUB:
-        /* -expr */
-    case K_NOT:
-        /* !expr */
-    case K_MUL:
-        /* *expr */
-    case K_BITAND:
-        /* &expr */
-    case K_BITNOT:
-        /* ~expr */
-        node->data.expr = parseExpr(self);
-        break;
-    default:
-        node->data.expr = NULL;
-        /* TODO: error */
-        break;
-    }
-
-    return node;
-}
-
-static CtAST* parseNameExpr(CtParser* self, CtToken tok)
-{
-    (void)self;
-    /* TODO: handle name::expr */
-    CtAST* name = astNew(AK_NAME);
-    name->tok = tok;
-    return name;
-}
-
 static CtAST* parseExpr(CtParser* self)
-{
-    CtToken tok = parseNext(self);
-    CtAST* node;
-
-    if (tok.kind == TK_INT || tok.kind == TK_STRING || tok.kind == TK_CHAR)
-    {
-        node = astNew(AK_LITERAL);
-        node->tok = tok;
-    }
-    else if (tok.kind == TK_IDENT)
-    {
-        node = parseNameExpr(self, tok);
-    }
-    else if (tok.kind == TK_KEYWORD)
-    {
-        node = parseInfixExpr(self, tok);
-    }
-    else
-    {
-        node = NULL;
-    }
-
-    /* TODO: postifx stuff */
-
-    return node;
-}
-
-static CtAST* parseStmt(CtParser* self)
 {
     (void)self;
     return NULL;
 }
 
-static CtASTList parseStmtList(CtParser* self)
+static CtAST* parseType(CtParser* self);
+
+static CtAST* parsePtrType(CtParser* self)
 {
-    CtASTList stmts;
+    CtAST* body = parseType(self);
+    CtAST* ptr = astNew(AK_PTR_TYPE);
+    ptr->data.to = body;
 
-    if (parseConsumeKey(self, K_RBRACE))
-    {
-        stmts.items = NULL;
-    }
-    else
-    {
-        stmts = astListNew(parseStmt(self));
-        while (!parseConsumeKey(self, K_RBRACE))
-        {
-            astListAdd(&stmts, parseStmt(self));
-        }
-    }
-
-    return stmts;
+    return ptr;
 }
 
-static CtAST* parseTypeName(CtParser* self)
+static CtAST* parseRefType(CtParser* self)
 {
-    /* matches ident (`::` ident)* */
-    CtASTList parts = parseCollect(self, parseExpectIdent, K_COLON2);
-    CtAST* out = astNew(AK_TYPENAME);
+    CtAST* body = parseType(self);
+    CtAST* ref = astNew(AK_REF_TYPE);
+    ref->data.to = body;
 
-    out->data.name = parts;
-
-    return out;
+    return ref;
 }
 
-static CtAST* parseArrayType(CtParser* self)
+static CtAST* parseArrType(CtParser* self)
 {
-    CtAST* type = parseType(self);
-
+    CtAST* body = parseType(self);
     CtAST* size = parseConsumeKey(self, K_COLON) ? parseExpr(self) : NULL;
-
     parseExpectKey(self, K_RSQUARE);
 
-    CtAST* node = astNew(AK_ARRAY);
-    node->data.arr.type = type;
-    node->data.arr.size = size;
+    CtAST* arr = astNew(AK_ARR_TYPE);
+    arr->data.arr.type = body;
+    arr->data.arr.size = size;
 
-    return node;
+    return arr;
 }
 
-static CtAST* parsePointerType(CtParser* self)
+static CtASTList parseFuncTypeArgs(CtParser* self)
 {
-    CtAST* node = astNew(AK_POINTER);
-    node->data.ptr = parseType(self);
-
-    return node;
+    return parseCollect(self, parseType, K_COMMA, K_RPAREN);
 }
 
-static CtAST* parseReferenceType(CtParser* self)
+static CtAST* parseFuncType(CtParser* self)
 {
-    CtAST* node = astNew(AK_REFERENCE);
-    node->data.ref = parseType(self);
+    CtASTList args = parseConsumeKey(self, K_LPAREN) ? parseFuncTypeArgs(self) : astListEmpty();
+    CtAST* result = parseConsumeKey(self, K_ARROW) ? parseType(self) : NULL;
 
-    return node;
+    CtAST* func = astNew(AK_FUNC_TYPE);
+    func->data.func_type.args = args;
+    func->data.func_type.result = result;
+
+    return func;
 }
 
-static CtAST* parseClosureType(CtParser* self)
+static CtAST* parseQualTypeArg(CtParser* self)
 {
-    parseExpectKey(self, K_LPAREN);
-
-    CtASTList args = parseCollect(self, parseType, K_COMMA);
-
-    parseExpectKey(self, K_RPAREN);
-
-    CtAST* result = parseConsumeKey(self, K_ARROW) ? NULL : parseType(self);
-
-    CtAST* node = astNew(AK_CLOSURE);
-    node->data.closure.args = args;
-    node->data.closure.result = result;
-
-    return node;
-}
-
-static CtAST* parseType(CtParser* self)
-{
-    if (parseConsumeKey(self, K_LSQUARE))
+    CtAST* name;
+    if (parseConsumeKey(self, K_COLON))
     {
-        return parseArrayType(self);
-    }
-    else if (parseConsumeKey(self, K_MUL))
-    {
-        return parsePointerType(self);
-    }
-    else if (parseConsumeKey(self, K_BITAND))
-    {
-        return parseReferenceType(self);
-    }
-    else if (parseConsumeKey(self, K_DEF))
-    {
-        return parseClosureType(self);
+        name = parseExpectIdent(self);
+        parseExpectKey(self, K_ASSIGN);
     }
     else
     {
-        return parseTypeName(self);
+        name = NULL;
     }
-}
 
-static CtAST* parseField(CtParser* self)
-{
-    CtAST* field;
-    CtAST* name = parseExpectIdent(self);
-    parseExpectKey(self, K_COLON);
     CtAST* type = parseType(self);
 
-    field = astNew(AK_FIELD);
-    field->data.field.name = name;
-    field->data.field.type = type;
+    CtAST* arg = astNew(AK_TYPE_ARG);
+    arg->data.type_arg.name = name;
+    arg->data.type_arg.type = type;
 
-    return field;
+    return arg;
 }
 
-static CtASTList parseFields(CtParser* self)
+static CtASTList parseQualTypeArgs(CtParser* self)
 {
-    CtASTList fields = astListNew(NULL);
+    /* context sensitive pain :^) */
+    self->source->depth++;
 
-    while (!parseConsumeKey(self, K_LBRACE))
-    {
-        astListAdd(&fields, parseField(self));
-        parseExpectKey(self, K_SEMI);
-    }
+    CtASTList args = parseCollect(self, parseQualTypeArg, K_COMMA, K_GT);
 
-    return fields;
-}
-
-static CtAST* parseStruct(CtParser* self)
-{
-    CtAST* struc;
-    CtAST* name = parseExpectIdent(self);
-
-    parseExpectKey(self, K_LBRACE);
-    CtASTList fields = parseFields(self);
-
-    struc = astNew(AK_STRUCT);
-    struc->data.struc.name = name;
-    struc->data.struc.fields = fields;
-
-    return struc;
-}
-
-static CtAST* parseUnion(CtParser* self)
-{
-    CtAST* uni;
-    CtAST* name = parseExpectIdent(self);
-
-    parseExpectKey(self, K_LBRACE);
-    CtASTList fields = parseFields(self);
-    parseExpectKey(self, K_RBRACE);
-
-    uni = astNew(AK_UNION);
-    uni->data.uni.name = name;
-    uni->data.uni.fields = fields;
-
-    return uni;
-}
-
-static CtASTList parseEnumData(CtParser* self)
-{
-    CtASTList data = astListNew(NULL);
-    while (!parseConsumeKey(self, K_RBRACE))
-    {
-        astListAdd(&data, parseField(self));
-    }
-
-    return data;
-}
-
-static CtAST* parseEnumField(CtParser* self)
-{
-    CtAST* name = parseExpectIdent(self);
-    CtASTList data;
-
-    if(parseConsumeKey(self, K_LBRACE))
-    {
-        data = parseEnumData(self);
-    }
-    else
-    {
-        data.items = NULL;
-    }
-
-    CtAST* val = parseConsumeKey(self, K_ASSIGN) ? parseExpr(self) : NULL;
-
-    CtAST* node = astNew(AK_ENUM_FIELD);
-    node->data.efield.name = name;
-    node->data.efield.data = data;
-    node->data.efield.val = val;
-
-    return node;
-}
-
-static CtASTList parseEnumFields(CtParser* self)
-{
-    return parseCollect(self, parseEnumField, K_COMMA);
-}
-
-static CtAST* parseEnum(CtParser* self)
-{
-    CtAST* enu;
-    CtAST* name = parseExpectIdent(self);
-    CtAST* backing = parseConsumeKey(self, K_COLON) ? NULL : parseType(self);
-
-    parseExpectKey(self, K_LBRACE);
-    CtASTList fields = parseEnumFields(self);
-    parseExpectKey(self, K_RBRACE);
-
-    enu = astNew(AK_ENUM);
-    enu->data.enu.name = name;
-    enu->data.enu.backing = backing;
-    enu->data.enu.fields = fields;
-
-    return enu;
-}
-
-static CtAST* parseAliasBody(CtParser* self)
-{
-    CtAST* node;
-
-    node = parseType(self);
-
-    return node;
-}
-
-static CtAST* parseAlias(CtParser* self)
-{
-    CtAST* node = astNew(AK_ALIAS);
-    CtASTAlias data;
-
-    data.name = parseExpectIdent(self);
-
-    parseExpectKey(self, K_ASSIGN);
-
-    data.symbol = parseAliasBody(self);
-
-    parseExpectKey(self, K_SEMI);
-
-    node->data.alias = data;
-
-    return node;
-}
-
-static CtAST* parseImport(CtParser* self)
-{
-    CtASTList path = parseCollect(self, parseExpectIdent, K_COLON2);
-
-    CtASTList items;
-
-    if (parseConsumeKey(self, K_LPAREN))
-    {
-        items = parseCollect(self, parseExpectIdent, K_COMMA);
-        parseExpectKey(self, K_RPAREN);
-    }
-    else
-    {
-        items.items = NULL;
-    }
-
-    parseExpectKey(self, K_SEMI);
-
-    CtAST* node = astNew(AK_IMPORT);
-    node->data.import.path = path;
-    node->data.import.items = items;
-
-    return node;
-}
-
-static CtAST* parseFunctionArg(CtParser* self)
-{
-    CtAST* name = parseExpectIdent(self);
-    parseExpectKey(self, K_COLON);
-    CtAST* type = parseType(self);
-
-    CtAST* init = parseConsumeKey(self, K_ASSIGN) ? parseExpr(self) : NULL;
-
-    CtAST* node = astNew(AK_ARG);
-    node->data.farg.name = name;
-    node->data.farg.type = type;
-    node->data.farg.init = init;
-
-    return node;
-}
-
-static CtASTList parseFunctionArgs(CtParser* self)
-{
-    CtASTList args;
-    if (parseConsumeKey(self, K_RPAREN))
-    {
-        args.items = NULL;
-    }
-    else
-    {
-        args = astListNew(parseFunctionArg(self));
-
-        while (parseConsumeKey(self, K_COMMA))
-        {
-            astListAdd(&args, parseFunctionArg(self));
-        }
-
-        parseExpectKey(self, K_RPAREN);
-    }
+    self->source->depth--;
 
     return args;
 }
 
-static CtAST* parseFunctionBody(CtParser* self)
+static CtAST* parseQualType(CtParser* self)
 {
-    /* no function body, is external function or prototype */
-    if (parseConsumeKey(self, K_SEMI))
+    CtAST* part = parseExpectIdent(self);
+    CtASTList params = parseConsumeKey(self, K_LT) ? parseQualTypeArgs(self) : astListEmpty();
+    CtAST* next = parseConsumeKey(self, K_COLON2) ? parseQualType(self) : NULL;
+
+    CtAST* qual = astNew(AK_QUAL_TYPE);
+    qual->data.qual_type.name = part;
+    qual->data.qual_type.params = params;
+    qual->data.qual_type.next = next;
+
+    return qual;
+}
+
+static CtAST* parseType(CtParser* self)
+{
+    if (parsePeek(self, TK_IDENT))
+    {
+        return parseQualType(self);
+    }
+    else if (parseConsumeKey(self, K_MUL))
+    {
+        return parsePtrType(self);
+    }
+    else if (parseConsumeKey(self, K_BITAND))
+    {
+        return parseRefType(self);
+    }
+    else if (parseConsumeKey(self, K_LSQUARE))
+    {
+        return parseArrType(self);
+    }
+    else if (parseConsumeKey(self, K_DEF))
+    {
+        return parseFuncType(self);
+    }
+    else
+    {
+        /* error */
         return NULL;
-
-    if (parseConsumeKey(self, K_ASSIGN))
-    {
-        CtAST* node = parseExpr(self);
-        parseExpectKey(self, K_SEMI);
-        return node;
-    }
-    else
-    {
-        parseExpectKey(self, K_LBRACE);
-        CtASTList body = parseStmtList(self);
-        CtAST* node = astNew(AK_STMTLIST);
-        node->data.stmts = body;
-        return node;
     }
 }
 
-static CtAST* parseFunction(CtParser* self)
+static CtAST* parseAliasBody(CtParser* self)
+{
+    /* for now an alias body can only be a type */
+    return parseType(self);
+}
+
+static CtAST* parseAlias(CtParser* self)
 {
     CtAST* name = parseExpectIdent(self);
+    parseExpectKey(self, K_ASSIGN);
+    CtAST* symbol = parseAliasBody(self);
 
-    CtASTList args;
-    if (parseConsumeKey(self, K_LPAREN))
-    {
-        args = parseFunctionArgs(self);
-    }
-    else
-    {
-        args.items = NULL;
-    }
+    CtAST* alias = astNew(AK_ALIAS);
+    alias->data.alias.name = name;
+    alias->data.alias.symbol = symbol;
 
-    CtAST* result = parseConsumeKey(self, K_ARROW) ? parseType(self) : NULL;
-
-    CtAST* body = parseFunctionBody(self);
-
-    CtAST* node = astNew(AK_FUNCTION);
-    node->data.func.name = name;
-    node->data.func.args = args;
-    node->data.func.result = result;
-    node->data.func.body = body;
-
-    return node;
-}
-
-static CtAST* parseVarName(CtParser* self)
-{
-    CtAST* name = parseExpectIdent(self);
-    CtAST* type = parseConsumeKey(self, K_COLON) ? parseType(self) : NULL;
-
-    CtAST* node = astNew(AK_VAR_NAME);
-    node->data.vname.name = name;
-    node->data.vname.type = type;
-
-    return node;
-}
-
-static CtASTList parseVarNames(CtParser* self)
-{
-    CtASTList names;
-
-    if (parseConsumeKey(self, K_LSQUARE))
-    {
-        names = parseCollect(self, parseVarName, K_COMMA);
-        parseConsumeKey(self, K_RSQUARE);
-    }
-    else
-    {
-        names = astListNew(parseVarName(self));
-    }
-
-    return names;
-}
-
-static CtAST* parseVar(CtParser* self)
-{
-    CtASTList names = parseVarNames(self);
-
-    CtAST* init = parseConsumeKey(self, K_ASSIGN) ? parseExpr(self) : NULL;
-    parseExpectKey(self, K_SEMI);
-
-    CtAST* node = astNew(AK_VAR);
-    node->data.var.names = names;
-    node->data.var.init = init;
-
-    return node;
+    return alias;
 }
 
 static CtAST* parseBody(CtParser* self)
@@ -1440,35 +1142,12 @@ static CtAST* parseBody(CtParser* self)
     {
         return parseAlias(self);
     }
-    else if (parseConsumeKey(self, K_IMPORT))
-    {
-        return parseImport(self);
-    }
-    else if (parseConsumeKey(self, K_STRUCT))
-    {
-        return parseStruct(self);
-    }
-    else if (parseConsumeKey(self, K_UNION))
-    {
-        return parseUnion(self);
-    }
-    else if (parseConsumeKey(self, K_ENUM))
-    {
-        return parseEnum(self);
-    }
-    else if (parseConsumeKey(self, K_DEF))
-    {
-        return parseFunction(self);
-    }
-    else if (parseConsumeKey(self, K_VAR))
-    {
-        return parseVar(self);
-    }
     else
     {
         return NULL;
     }
 }
+
 /**
  * public api
  */
@@ -1508,6 +1187,7 @@ CtLexer* ctLexOpen(CtStream* stream)
     CtLexer* self = CT_MALLOC(sizeof(CtLexer));
     self->stream = stream;
     self->err = NULL;
+    self->depth = 0;
 
     return self;
 }
@@ -1573,6 +1253,7 @@ CtParser* ctParseOpen(CtLexer* source)
     CtParser* self = CT_MALLOC(sizeof(CtParser));
     self->source = source;
     self->tok.kind = TK_INVALID;
+    self->err = NULL;
 
     return self;
 }
@@ -1585,41 +1266,12 @@ void ctParseClose(CtParser* self)
 
 CtAST* ctParseNext(CtParser* self)
 {
-    CtAST* body = parseBody(self);
 
-    if (body)
-        return body;
-
-    /* fallback to parsing a statement if all else fails */
-    return parseStmt(self);
 }
 
 CtAST* ctParseUnit(CtParser* self)
 {
-    CtAST* node = astNew(AK_UNIT);
-    CtASTList imports = astListNew(NULL);
-    CtASTList symbols = astListNew(NULL);
 
-    while (parseConsumeKey(self, K_IMPORT))
-    {
-        astListAdd(&imports, parseImport(self));
-    }
-
-    while (1)
-    {
-        CtAST* body = parseBody(self);
-        if (!body)
-            break;
-
-        astListAdd(&symbols, body);
-    }
-
-    parseExpect(self, TK_EOF);
-
-    node->data.unit.imports = imports;
-    node->data.unit.symbols = symbols;
-
-    return node;
 }
 
 void ctFreeAST(CtAST* node)
@@ -1628,7 +1280,7 @@ void ctFreeAST(CtAST* node)
 }
 
 CtInterp* ctInterpOpen(CtInterpData data)
-{   
+{
     CtInterp* self = CT_MALLOC(sizeof(CtInterp));
     self->userdata = data;
 

@@ -19,7 +19,7 @@ objectDecl : 'object' Ident '{' objectField* '}' ;
 field : Ident ':' type ';' ;
 
 structDecl : 'struct' Ident '{' field* '}' ;
-unionDecl : 'union' Ident '{' field* '}' ;
+unionDecl : 'union' Ident '{' field+ '}' ;
 
 enumData : '{' field* '}' ;
 enumField : Ident enumData? ('=' expr)? ;
@@ -28,11 +28,8 @@ enumDecl : 'enum' Ident (':' type)? '{' enumFields? '}' ;
 
 funcDecl : 'def' funcName funcArgs? funcTail? funcBody ;
 funcName : Ident ;
-funcArgs : '(' funcArgsBody? ')' ;
-funcArgsBody : funcArg (',' funcArgsBody) | defaultFuncArgs ;
-funcArg : Ident ':' type ;
-defaultFuncArgs : defaultFuncArg (',' defaultFuncArg)*;
-defaultFuncArg : Ident ':' type '=' expr ;
+funcArgs : '(' funcArg (',' funcArg)* ')' ;
+funcArg : Ident ':' type ('=' expr)? ;
 funcTail : '->' type ;
 funcBody : stmtList | '=' expr ';' | ';' ;
 
@@ -43,80 +40,77 @@ varNames : varName | '[' varName (',' varName)* ']' ;
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : expr ';' | stmtList | varDecl | aliasDecl | returnStmt | forStmt | whileStmt | ifStmt | ';' | funcDecl ;
+stmt : stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | funcDecl | expr ';' | ';' ;
 
-returnStmt : 'return' expr? ';' ;
-
-forStmt : 'for' (forRange | forLoop) stmt ;
-forRange : varNames ':' expr ;
-forLoop : varDecl? ';' expr? ';' expr? ';' ;
-
+// we use <| to solve some abiguity with varNames
+forStmt : 'for' varNames '<|' expr stmt ;
 whileStmt : 'while' expr stmt ;
-
 ifStmt : 'if' expr stmt elifStmt* elseStmt? ;
 elifStmt : 'else' 'if' expr stmt ;
 elseStmt : 'else' stmt ;
 
+returnStmt : 'return' expr? ';' ;
+
 stmtList : '{' stmt* '}' ;
 
 type
-    : nameType
+    : qualType
     | ptrType
-    | arrayType
-    | funcType
     | refType
+    | arrType
+    | funcType
     ;
 
-nameType : Ident ('::' Ident)* ;
+// so we use < and > for templates
+// this leads to some ambiguity with >> on closing templates
+// C++ also suffers from this, as such our lexer is context senstive
+
+// the ':' prefix is there to make parsing less painful
+// since Ident is a valid type
+typeArg : type | ':' Ident '=' type ;
+typeArgs : '<' typeArg (',' typeArg)* '>' ;
+qualType : Ident typeArgs? ('::' qualType)* ;
+
+arrType : '[' type (':' expr)? ']' ;
 ptrType : '*' type ;
 refType : '&' type ;
-arrayType : '[' type (':' expr)? ']' ;
-funcType : 'def' '(' funcTypeArgs? ')' funcTypeTail? ;
-funcTypeArgs : type (',' type)* ;
-funcTypeTail : '->' type ;
+
+typeList : type (',' type)* ;
+funcTypeArgs : '(' typeList? ')' ;
+funcTypeResult : '->' type ;
+funcType : 'def' funcTypeArgs? funcTypeResult? ;
 
 expr
-    : (IntLiteral | StringLiteral | CharLiteral | unaryExpr | nameExpr | coerceExpr | '(' expr ')' | compoundExpr) (binaryExpr | ternaryExpr | subscriptExpr | accessExpr | derefExpr | callExpr initExpr? | initExpr)*
-    | initExpr
+    : expr '[' expr ']'
+    | expr '.' Ident
+    | expr '->' Ident
+    | expr call
+    | 'coerce' '<' type '>' '(' expr ')'
+    | prefixExpr
     ;
 
-coerceExpr : 'coerce' '<' type '>' '(' expr ')' ;
+arg : expr | '[' Ident ']' '=' expr ;
+args : arg (',' arg)* ;
+call : '(' args? ')' ;
 
-unaryOp : '+' | '-' | '!' | '~' | '&' | '*' ;
-binaryOp
-    : '+' | '+='
-    | '-' | '-='
-    | '*' | '*='
-    | '/' | '/='
-    | '%' | '%='
-    | '&' | '&='
-    | '|' | '|='
-    | '^' | '^='
-    | '<<' | '<<='
-    | '>>' | '>>='
-    | '||' | '&&'
-    | '<' | '<='
-    | '>' | '>='
-    | '!=' | '=='
-    | '='
-    ;
+// lots of nice operator precedence
+prefixExpr : ('-' | '~' | '*' | '&') infixModExpr ;
+infixModExpr : bitshiftExpr ('*' | '/' | '%') bitshiftExpr ;
+bitshiftExpr : bitwiseExpr ('<<' | '>>') bitwiseExpr ;
+bitwiseExpr : infixMathExpr ('^' | '|' | '&') infixMathExpr ;
+infixMathExpr : equalityExpr ('+' | '-') equalityExpr ;
+equalityExpr : compareExpr ('==' | '!=') compareExpr ;
+compareExpr : logicExpr ('>=' | '>' | '<=' | '<') logicExpr ;
+logicExpr : ternaryExpr ('&&' | '||') ternaryExpr ;
+ternaryExpr : sideExpr '?' sideExpr? ':' sideExpr ;
+sideExpr : atom ('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') atom;
 
-compoundExpr : '[' expr (',' expr)* ']' ;
-nameExpr : Ident ('::' Ident) ;
-unaryExpr : unaryOp expr ;
-binaryExpr : binaryOp expr ;
-ternaryExpr : '?' expr? ':' expr ;
-subscriptExpr : '[' expr ']' ;
-callExpr : '(' callArgs? ')' ;
-callArgs : expr (',' callArgs)? | namedArgs ;
-namedArgs : namedArg (',' namedArg)* ;
-namedArg : '[' Ident ']' '=' expr ;
-initExpr : '{' initBody? '}' ;
-initBody : expr (',' initBody)? | namedInitBody ;
-namedInitBody : namedInitArg (',' namedInitArg)* ;
-namedInitArg : '[' expr ']' '=' expr ;
-accessExpr : '.' Ident ;
-derefExpr : '->' Ident ;
+initArg : expr | '[' expr ']' '=' expr ;
+initArgs : initArg (',' initArg)* ;
+init : '{' initArgs? '}' ;
+
+atom : IntLiteral | StringLiteral | CharLiteral | qualType init? | '(' expr ')' ;
+
 
 IntLiteral : (Base10 | Base2 | Base16) Ident? ;
 StringLiteral : Ident? (SingleString | MultiString) ;

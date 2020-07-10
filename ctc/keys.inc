@@ -114,6 +114,7 @@ OP(K_COLON2, "::")
 OP(K_SEMI, ";")
 OP(K_AT, "@")
 OP(K_ARROW, "->")
+OP(K_STREAM, "<|")
 
 OP(K_LPAREN, "(")
 OP(K_RPAREN, ")")
