@@ -6,6 +6,10 @@
 #   define KEY(id, str)
 #endif
 
+#ifndef INST
+#   define INST(arch, id, op)
+#endif
+
 /* language keywords */
 KEY(K_IMPORT, "import")
 KEY(K_ALIAS, "alias")
@@ -125,5 +129,28 @@ OP(K_RBRACE, "}")
 OP(K_LSQUARE, "[")
 OP(K_RSQUARE, "]")
 
+/**
+ * example instructions for now
+ */
+INST(AR_I8086, IN_MOV, "mov")
+INST(AR_I8086, IN_XOR, "xor")
+
+INST(AR_X86, IN_CPUID, "cpuid")
+INST(AR_X86, IN_RDMSR, "rdmsr")
+INST(AR_X86, IN_WRMSR, "wrmsr")
+INST(AR_X86, IN_RDTSC, "rdtsc")
+
+/* yes i know the name is x86_64 or amd64 but im not writing that out a million times */
+INST(AR_X64, IN_POPFQ, "popfq")
+INST(AR_X64, IN_PUSHFQ, "pushfq")
+
+/**
+ * TODO: deal with conflicting instruction names
+ */
+
+INST(AR_LEG, IN_LOAD, "load")
+INST(AR_LEG, IN_STORE, "store")
+
 #undef OP
 #undef KEY
+#undef INST

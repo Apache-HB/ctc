@@ -190,8 +190,16 @@ typedef enum {
     /* string, char, or int */
     AK_LITERAL,
 
+    /* qualType init? */
+    AK_ATOM,
+
     /* (expr) */
     AK_PAREN,
+
+    AK_TERNARY,
+
+    /* ([expr] =)? expr */
+    AK_INIT_ARG,
 
     /* declarations */
     AK_ALIAS
@@ -227,6 +235,33 @@ typedef struct {
     struct CtAST* expr;
 } CtASTCoerce;
 
+typedef struct {
+    struct CtAST* body;
+    CtASTList init;
+} CtASTAtom;
+
+typedef struct {
+    struct CtAST* slot;
+    struct CtAST* expr;
+} CtASTInitArg;
+
+typedef struct {
+    struct CtAST* cond;
+
+    /**
+     * if truthy is NULL then its a cond ?: expr
+     * this means that cond is evaluated, then if cond is false
+     * falsey is evaluated, otherwise the ternary evaluates to cond
+     *
+     * basically shorthand for
+     *
+     * expr = cond ? cond : falsey;
+     */
+
+    struct CtAST* truthy;
+    struct CtAST* falsey;
+} CtASTTernary;
+
 typedef union {
     /* AK_ERROR */
     char* reason;
@@ -258,6 +293,15 @@ typedef union {
     /* AK_PAREN */
     /* AK_UNARY, the unary operator is stored in tok */
     struct CtAST* body;
+
+    /* AK_ATOM */
+    CtASTAtom atom;
+
+    /* AK_INIT_ARG */
+    CtASTInitArg init_arg;
+
+    /* AK_TERNARY */
+    CtASTTernary ternary;
 } CtASTData;
 
 typedef struct CtAST {

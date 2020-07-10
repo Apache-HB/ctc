@@ -1048,23 +1048,102 @@ static CtAST* parseUnaryExpr(CtParser* self)
 
 #define TRY_PARSE(node, func) { node = func; if (node) return node; }
 
+static CtAST* parseInitArg(CtParser* self)
+{
+    CtAST* slot;
+    if (parseConsumeKey(self, K_LSQUARE))
+    {
+        slot = parseExpr(self);
+        parseExpectKey(self, K_RSQUARE);
+        parseExpectKey(self, K_ASSIGN);
+    }
+    else
+    {
+        slot = NULL;
+    }
+
+    CtAST* expr = parseExpr(self);
+
+    CtAST* arg = astNew(AK_INIT_ARG);
+    arg->data.init_arg.slot = slot;
+    arg->data.init_arg.expr = expr;
+
+    return arg;
+}
+
+static CtASTList parseInitExpr(CtParser* self)
+{
+    return parseCollect(self, parseInitArg, K_COMMA, K_RBRACE);
+}
+
+#define IS_BINARY_OP(key) (key == K_ADD || K_ADDEQ)
+
 static CtAST* parseExpr(CtParser* self)
 {
     CtAST* node;
-
-    TRY_PARSE(node, parseUnaryExpr(self));
 
     CtToken tok = parseNext(self);
 
     if (tok.kind == TK_STRING || tok.kind == TK_CHAR || tok.kind == TK_INT)
     {
-        CtAST* node = astNew(AK_LITERAL);
+        /* is a literal */
+        node = astNew(AK_LITERAL);
         node->tok = tok;
     }
     else if (tok.kind == TK_IDENT)
     {
+        /* put the token back for parseQualType */
         self->tok = tok;
-        node = parseQualType(self);
+        node = astNew(AK_ATOM);
+        node->data.atom.body = parseQualType(self);
+        node->data.atom.init = parseConsumeKey(self, K_LBRACE) ? parseInitExpr(self) : astListEmpty();
+    }
+    else if (tok.kind == TK_KEYWORD)
+    {
+        self->tok = tok;
+        node = parseUnaryExpr(self);
+    }
+    else
+    {
+        node = NULL;
+        /* oh no */
+    }
+
+    if (!node)
+        return NULL;
+
+    while (1)
+    {
+        tok = parseNext(self);
+
+        if (tok.kind == TK_KEYWORD)
+        {
+            /* here we get a binary expr */
+
+            if (tok.data.key == K_QUESTION)
+            {
+                /* a ternary expr */
+                CtAST* truthy = parseConsumeKey(self, K_COLON) ? NULL : parseExpr(self);
+                CtAST* falsey = parseExpr(self);
+
+                CtAST* cond = node;
+
+                node = astNew(AK_TERNARY);
+                node->data.ternary.cond = cond;
+                node->data.ternary.falsey = falsey;
+                node->data.ternary.truthy = truthy;
+            }
+            else
+            {
+                self->tok = tok;
+                break;
+            }
+        }
+        else
+        {
+            self->tok = tok;
+            break;
+        }
     }
 
     return node;

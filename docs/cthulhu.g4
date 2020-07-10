@@ -102,7 +102,7 @@ binaryMathExpr : equalityExpr ('+' | '-') equalityExpr ;
 equalityExpr : compareExpr ('==' | '!=') compareExpr ;
 compareExpr : logicExpr ('>=' | '>' | '<=' | '<') logicExpr ;
 logicExpr : ternaryExpr ('&&' | '||') ternaryExpr ;
-ternaryExpr : sideExpr '?' sideExpr? ':' sideExpr ;
+ternaryExpr : sideExpr '?' sideExpr ':' sideExpr ;
 sideExpr : atom ('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') atom;
 
 initArg : expr | '[' expr ']' '=' expr ;
