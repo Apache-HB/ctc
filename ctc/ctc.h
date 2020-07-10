@@ -181,11 +181,17 @@ typedef enum {
     AK_FUNC_TYPE,
     AK_QUAL_TYPE,
     AK_TYPE_ARG,
-    AK_TYPE,
+    AK_QUAL_TYPE_LIST,
 
     /* expressions */
     AK_COERCE,
     AK_UNARY,
+
+    /* string, char, or int */
+    AK_LITERAL,
+
+    /* (expr) */
+    AK_PAREN,
 
     /* declarations */
     AK_ALIAS
@@ -243,12 +249,15 @@ typedef union {
     /* AK_QUAL_TYPE */
     CtASTQualType qual_type;
 
-    /* AK_TYPE */
-    /* will be a list of CtASTQualType */
-    CtASTList type;
+    /* AK_QUAL_TYPE_LIST */
+    CtASTList types;
 
     /* AK_COERCE */
     CtASTCoerce coerce;
+
+    /* AK_PAREN */
+    /* AK_UNARY, the unary operator is stored in tok */
+    struct CtAST* body;
 } CtASTData;
 
 typedef struct CtAST {

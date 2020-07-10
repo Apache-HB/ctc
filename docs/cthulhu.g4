@@ -66,7 +66,7 @@ type
 // C++ also suffers from this, as such our lexer is context senstive
 
 // the ':' prefix is there to make parsing less painful
-// since Ident is a valid type
+// since Ident is a valid typename and lookahead is painful
 typeArg : type | ':' Ident '=' type ;
 typeArgs : '<' typeArg (',' typeArg)* '>' ;
 qualType : Ident typeArgs? ('::' qualType)* ;

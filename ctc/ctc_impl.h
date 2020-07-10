@@ -984,15 +984,20 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
     return parts;
 }
 
+#define IN_TEMPLATE(self, ...) { self->source->depth++; { __VA_ARGS__ } self->source->depth--; }
+
+static CtAST* parseExpr(CtParser* self);
+static CtAST* parseType(CtParser* self);
+
 static CtAST* parseCoerceExpr(CtParser* self)
 {
-    /* context sensitive pain :^) */
-    self->source->depth++;
+    CtAST* type;
 
-    CtAST* type = parseType(self);
-    parseExpectKey(self, K_GT);
-
-    self->source->depth--;
+    IN_TEMPLATE(self, {
+        parseExpectKey(self, K_LT);
+        type = parseType(self);
+        parseExpectKey(self, K_GT);
+    })
 
     parseExpectKey(self, K_LPAREN);
     CtAST* expr = parseExpr(self);
@@ -1005,31 +1010,64 @@ static CtAST* parseCoerceExpr(CtParser* self)
     return node;
 }
 
-static CtAST* parseInfixExpr(CtParser* self)
-{
-    CtAST* node;
+#define IS_UNARY(kind) (kind == K_SUB || kind == K_BITNOT || kind == K_MUL || kind == K_BITAND)
 
-    if (parseConsumeKey(self, K_COERCE))
+static CtAST* parseUnaryExpr(CtParser* self)
+{
+    CtAST* node = NULL;
+
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_KEYWORD)
     {
-        node = parseCoerceExpr(self);
+        if (tok.data.key == K_COERCE)
+        {
+            node = parseCoerceExpr(self);
+        }
+        else if (tok.data.key == K_LPAREN)
+        {
+            node = astNew(AK_PAREN);
+            node->data.body = parseExpr(self);
+            parseExpectKey(self, K_RPAREN);
+        }
+        else if (IS_UNARY(tok.data.key))
+        {
+            node = astNew(AK_UNARY);
+            node->tok = tok;
+            node->data.body = parseExpr(self);
+        }
     }
+
+    /* if its not a unary expression then put back the token */
+    if (!node)
+        self->tok = tok;
 
     return node;
 }
+
+#define TRY_PARSE(node, func) { node = func; if (node) return node; }
 
 static CtAST* parseExpr(CtParser* self)
 {
     CtAST* node;
 
-    if (parsePeek(self, TK_KEYWORD))
+    TRY_PARSE(node, parseUnaryExpr(self));
+
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_STRING || tok.kind == TK_CHAR || tok.kind == TK_INT)
     {
-        node = parseInfixExpr(self);
+        CtAST* node = astNew(AK_LITERAL);
+        node->tok = tok;
+    }
+    else if (tok.kind == TK_IDENT)
+    {
+        self->tok = tok;
+        node = parseQualType(self);
     }
 
     return node;
 }
-
-static CtAST* parseType(CtParser* self);
 
 static CtAST* parsePtrType(CtParser* self)
 {
@@ -1103,12 +1141,11 @@ static CtAST* parseQualTypeArg(CtParser* self)
 
 static CtASTList parseQualTypeArgs(CtParser* self)
 {
-    /* context sensitive pain :^) */
-    self->source->depth++;
+    CtASTList args;
 
-    CtASTList args = parseCollect(self, parseQualTypeArg, K_COMMA, K_GT);
-
-    self->source->depth--;
+    IN_TEMPLATE(self, {
+        args = parseCollect(self, parseQualTypeArg, K_COMMA, K_GT);
+    })
 
     return args;
 }
@@ -1129,8 +1166,8 @@ static CtAST* parseQualType(CtParser* self)
 {
     CtASTList parts = parseCollect(self, parseQualTypeItem, K_COLON2, K_INVALID);
 
-    CtAST* type = astNew(AK_TYPE);
-    type->data.type = parts;
+    CtAST* type = astNew(AK_QUAL_TYPE_LIST);
+    type->data.types = parts;
 
     return type;
 }
