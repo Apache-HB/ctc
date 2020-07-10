@@ -174,12 +174,17 @@ typedef enum {
     AK_ERROR,
     AK_IDENT,
 
+    /* types */
     AK_PTR_TYPE,
     AK_REF_TYPE,
     AK_ARR_TYPE,
     AK_FUNC_TYPE,
     AK_QUAL_TYPE,
     AK_TYPE_ARG,
+
+    /* expressions */
+    AK_COERCE,
+    AK_UNARY,
 
     /* declarations */
     AK_ALIAS
@@ -211,6 +216,11 @@ typedef struct {
     struct CtAST* next;
 } CtASTQualType;
 
+typedef struct {
+    struct CtAST* type;
+    struct CtAST* expr;
+} CtASTCoerce;
+
 typedef union {
     /* AK_ERROR */
     char* reason;
@@ -232,6 +242,9 @@ typedef union {
 
     /* AK_QUAL_TYPE */
     CtASTQualType qual_type;
+
+    /* AK_COERCE */
+    CtASTCoerce coerce;
 } CtASTData;
 
 typedef struct CtAST {

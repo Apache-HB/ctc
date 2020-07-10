@@ -15,6 +15,11 @@ def main {
     var [argc: u32, argv: *str] = rt::sys::args();
     var arg_vec = rt::vec<str>::new(argv, argc);
     loop<str>(arg_vec);
+
+    var l1 = () => 5;
+    let l2 = () { return 5; };
+    let l3 = () <| 5;
+    let l4 = () [] -> type { };
 }
 
 alias ivec = Vector<i32, :alloc = GlobalAlloc<i32>>;

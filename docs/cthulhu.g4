@@ -86,7 +86,7 @@ expr
     | expr '->' Ident
     | expr call
     | 'coerce' '<' type '>' '(' expr ')'
-    | prefixExpr
+    | unaryExpr
     ;
 
 arg : expr | '[' Ident ']' '=' expr ;
@@ -94,11 +94,11 @@ args : arg (',' arg)* ;
 call : '(' args? ')' ;
 
 // lots of nice operator precedence
-prefixExpr : ('-' | '~' | '*' | '&') infixModExpr ;
-infixModExpr : bitshiftExpr ('*' | '/' | '%') bitshiftExpr ;
+unaryExpr : ('-' | '~' | '*' | '&') binaryModExpr ;
+binaryModExpr : bitshiftExpr ('*' | '/' | '%') bitshiftExpr ;
 bitshiftExpr : bitwiseExpr ('<<' | '>>') bitwiseExpr ;
-bitwiseExpr : infixMathExpr ('^' | '|' | '&') infixMathExpr ;
-infixMathExpr : equalityExpr ('+' | '-') equalityExpr ;
+bitwiseExpr : binaryMathExpr ('^' | '|' | '&') binaryMathExpr ;
+binaryMathExpr : equalityExpr ('+' | '-') equalityExpr ;
 equalityExpr : compareExpr ('==' | '!=') compareExpr ;
 compareExpr : logicExpr ('>=' | '>' | '<=' | '<') logicExpr ;
 logicExpr : ternaryExpr ('&&' | '||') ternaryExpr ;

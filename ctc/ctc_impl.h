@@ -984,10 +984,49 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
     return parts;
 }
 
+static CtAST* parseCoerceExpr(CtParser* self)
+{
+    /* context sensitive pain :^) */
+    self->source->depth++;
+
+    CtAST* type = parseType(self);
+    parseExpectKey(self, K_GT);
+
+    self->source->depth--;
+
+    parseExpectKey(self, K_LPAREN);
+    CtAST* expr = parseExpr(self);
+    parseExpectKey(self, K_RPAREN);
+
+    CtAST* node = astNew(AK_COERCE);
+    node->data.coerce.type = type;
+    node->data.coerce.expr = expr;
+
+    return node;
+}
+
+static CtAST* parseInfixExpr(CtParser* self)
+{
+    CtAST* node;
+
+    if (parseConsumeKey(self, K_COERCE))
+    {
+        node = parseCoerceExpr(self);
+    }
+
+    return node;
+}
+
 static CtAST* parseExpr(CtParser* self)
 {
-    (void)self;
-    return NULL;
+    CtAST* node;
+
+    if (parsePeek(self, TK_KEYWORD))
+    {
+        node = parseInfixExpr(self);
+    }
+
+    return node;
 }
 
 static CtAST* parseType(CtParser* self);
