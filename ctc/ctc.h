@@ -196,6 +196,9 @@ typedef enum {
     /* (expr) */
     AK_PAREN,
 
+    /* { initArgs } */
+    AK_INIT,
+
     AK_TERNARY,
 
     /* ([expr] =)? expr */
@@ -302,6 +305,9 @@ typedef union {
 
     /* AK_TERNARY */
     CtASTTernary ternary;
+
+    /* AK_INIT */
+    CtASTList fields;
 } CtASTData;
 
 typedef struct CtAST {
