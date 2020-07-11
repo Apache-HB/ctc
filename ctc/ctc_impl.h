@@ -990,208 +990,61 @@ static CtAST* parseExpr(CtParser* self);
 static CtAST* parseType(CtParser* self);
 static CtAST* parseQualType(CtParser* self);
 
-static CtAST* parseCoerceExpr(CtParser* self)
+
+
+static CtAST* parseUnary(CtParser* self)
 {
-    CtAST* type;
 
-    IN_TEMPLATE(self, {
-        parseExpectKey(self, K_LT);
-        type = parseType(self);
-        parseExpectKey(self, K_GT);
-    })
-
-    parseExpectKey(self, K_LPAREN);
-    CtAST* expr = parseExpr(self);
-    parseExpectKey(self, K_RPAREN);
-
-    CtAST* node = astNew(AK_COERCE);
-    node->data.coerce.type = type;
-    node->data.coerce.expr = expr;
-
-    return node;
-}
-#define TRY_PARSE(node, func) { node = func; if (node) return node; }
-
-static CtAST* parseInitArg(CtParser* self)
-{
-    CtAST* slot;
-    if (parseConsumeKey(self, K_LSQUARE))
-    {
-        slot = parseExpr(self);
-        parseExpectKey(self, K_RSQUARE);
-        parseExpectKey(self, K_ASSIGN);
-    }
-    else
-    {
-        slot = NULL;
-    }
-
-    CtAST* expr = parseExpr(self);
-
-    CtAST* arg = astNew(AK_INIT_ARG);
-    arg->data.init_arg.slot = slot;
-    arg->data.init_arg.expr = expr;
-
-    return arg;
 }
 
-static CtASTList parseInitExpr(CtParser* self)
+static CtAST* parseMul(CtParser* self)
 {
-    return parseCollect(self, parseInitArg, K_COMMA, K_RBRACE);
+
 }
 
-#define IS_UNARY(kind) (kind == K_SUB || kind == K_BITNOT || kind == K_MUL || kind == K_BITAND)
-
-static CtAST* parseUnaryExpr(CtParser* self)
+static CtAST* parseBitshift(CtParser* self)
 {
-    CtAST* node = NULL;
 
-    CtToken tok = parseNext(self);
-
-    if (tok.kind == TK_KEYWORD)
-    {
-        if (tok.data.key == K_COERCE)
-        {
-            node = parseCoerceExpr(self);
-        }
-        else if (tok.data.key == K_LPAREN)
-        {
-            node = astNew(AK_PAREN);
-            node->data.body = parseExpr(self);
-            parseExpectKey(self, K_RPAREN);
-        }
-        else if (tok.data.key == K_LBRACE)
-        {
-            /* init expr */
-            node = astNew(AK_INIT);
-            node->data.fields = parseInitExpr(self);
-        }
-        else if (IS_UNARY(tok.data.key))
-        {
-            node = astNew(AK_UNARY);
-            node->tok = tok;
-            node->data.body = parseExpr(self);
-        }
-    }
-
-    /* if its not a unary expression then put back the token */
-    if (!node)
-        self->tok = tok;
-
-    return node;
 }
 
-typedef enum {
-    P_MUL = 1,
-    P_BITSHIFT = 2,
-    P_BITWISE = 3,
-    P_MATH = 4,
-    P_EQUALITY = 5,
-    P_COMPARE = 6,
-    P_LOGIC = 7,
-    P_TERNARY = 8,
-    P_SIDE = 9,
-    P_ERROR = 0
-} CtPrecedence;
-
-static CtPrecedence getPrecdence(CtKeyword key)
+static CtAST* parseBitwise(CtParser* self)
 {
-    switch (key)
-    {
-    case K_MUL: case K_DIV: case K_MOD:
-        return P_MUL;
-    case K_SHL: case K_SHR:
-        return P_BITSHIFT;
-    case K_BITXOR: case K_BITOR: case K_BITAND:
-        return P_BITWISE;
-    case K_ADD: case K_SUB:
-        return P_MATH;
-    case K_EQ: case K_NEQ:
-        return P_EQUALITY;
-    case K_LTE: case K_LT: case K_GTE: case K_GT:
-        return P_COMPARE;
-    case K_AND: case K_OR:
-        return P_LOGIC;
-    case K_ASSIGN: case K_MULEQ: case K_DIVEQ:
-    case K_ADDEQ: case K_SUBEQ: case K_SHLEQ:
-    case K_SHREQ: case K_BITANDEQ: case K_BITOREQ:
-    case K_BITXOREQ:
-        return P_SIDE;
 
-    default:
-        return P_ERROR;
-    }
+}
+
+static CtAST* parseMath(CtParser* self)
+{
+
+}
+
+static CtAST* parseEquality(CtParser* self)
+{
+
+}
+
+static CtAST* parseCompare(CtParser* self)
+{
+
+}
+
+static CtAST* parseLogic(CtParser* self)
+{
+
+}
+
+static CtAST* parseTernary(CtParser* self)
+{
+
+}
+
+static CtAST* parseAssign(CtParser* self)
+{
+
 }
 
 static CtAST* parseExpr(CtParser* self)
 {
-    CtAST* node;
 
-    CtToken tok = parseNext(self);
-
-    if (tok.kind == TK_STRING || tok.kind == TK_CHAR || tok.kind == TK_INT)
-    {
-        /* is a literal */
-        node = astNew(AK_LITERAL);
-        node->tok = tok;
-    }
-    else if (tok.kind == TK_IDENT)
-    {
-        /* put the token back for parseQualType */
-        self->tok = tok;
-        node = astNew(AK_ATOM);
-        node->data.atom.body = parseQualType(self);
-        node->data.atom.init = parseConsumeKey(self, K_LBRACE) ? parseInitExpr(self) : astListEmpty();
-    }
-    else if (tok.kind == TK_KEYWORD)
-    {
-        self->tok = tok;
-        node = parseUnaryExpr(self);
-    }
-    else
-    {
-        node = NULL;
-        /* oh no */
-    }
-
-    if (!node)
-        return NULL;
-
-    while (1)
-    {
-        tok = parseNext(self);
-
-        if (tok.kind == TK_KEYWORD)
-        {
-            /* here we get a binary expr */
-
-            if (tok.data.key == K_QUESTION)
-            {
-                /* a ternary expr */
-                CtAST* truthy = parseConsumeKey(self, K_COLON) ? NULL : parseExpr(self);
-                CtAST* falsey = parseExpr(self);
-
-                CtAST* cond = node;
-
-                node = astNew(AK_TERNARY);
-                node->data.ternary.cond = cond;
-                node->data.ternary.falsey = falsey;
-                node->data.ternary.truthy = truthy;
-            }
-            else
-            {
-                self->tok = tok;
-                break;
-            }
-        }
-        else
-        {
-            self->tok = tok;
-            break;
-        }
-    }
-
-    return node;
 }
 
 static CtAST* parsePtrType(CtParser* self)

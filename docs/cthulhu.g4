@@ -81,36 +81,74 @@ funcTypeResult : '->' type ;
 funcType : 'def' funcTypeArgs? funcTypeResult? ;
 
 expr
-    : expr '[' expr ']'
-    | expr '.' Ident
-    | expr '->' Ident
-    | expr call
-    | 'coerce' '<' type '>' '(' expr ')'
-    | unaryExpr
+    : IntLiteral
+    | StringLiteral
+    | CharLiteral
+    | qualType 
+    | qualType '{' initArgs* '}'
+    | '(' atom ')'
+    | '{' initArgs? '}'
     ;
-
-arg : expr | '[' Ident ']' '=' expr ;
-args : arg (',' arg)* ;
-call : '(' args? ')' ;
-
-// lots of nice operator precedence
-unaryExpr : ('-' | '~' | '*' | '&') binaryModExpr ;
-binaryModExpr : bitshiftExpr ('*' | '/' | '%') bitshiftExpr ;
-bitshiftExpr : bitwiseExpr ('<<' | '>>') bitwiseExpr ;
-bitwiseExpr : binaryMathExpr ('^' | '|' | '&') binaryMathExpr ;
-binaryMathExpr : equalityExpr ('+' | '-') equalityExpr ;
-equalityExpr : compareExpr ('==' | '!=') compareExpr ;
-compareExpr : logicExpr ('>=' | '>' | '<=' | '<') logicExpr ;
-logicExpr : ternaryExpr ('&&' | '||') ternaryExpr ;
-ternaryExpr : sideExpr '?' sideExpr ':' sideExpr ;
-sideExpr : atom ('=' | '*=' | '/=' | '%=' | '+=' | '-=' | '<<=' | '>>=' | '&=' | '^=' | '|=') atom;
 
 initArg : expr | '[' expr ']' '=' expr ;
 initArgs : initArg (',' initArg)* ;
-init : '{' initArgs? '}' ;
 
-atom : IntLiteral | StringLiteral | CharLiteral | qualType init? | '(' expr ')' ;
+callArg : expr | '[' Ident ']' '=' expr ;
+callArgs : callArg (',' callArg)* ;
 
+assignExpr 
+    : condExpr 
+    | assignExpr ('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr 
+    ;
+
+condExpr : logicExpr ('?' expr? ':' condExpr)? ;
+
+logicExpr 
+    : compareExpr 
+    | logicExpr ('&&' | '||') compareExpr 
+    ;
+
+compareExpr 
+    : equalityExpr 
+    | compareExpr ('<=' | '<' | '>=' | '>') equalityExpr 
+    ;
+
+equalityExpr 
+    : arithmaticExpr
+    | equalityExpr ('==' | '!=') arithmaticExpr 
+    ;
+
+arithmaticExpr 
+    : bitwiseExpr 
+    | arithmaticExpr ('+' | '-') bitwiseExpr 
+    ;
+
+bitwiseExpr 
+    : bitshiftExpr 
+    | bitwiseExpr ('^' | '|' | '&') bitshiftExpr 
+    ;
+
+bitshiftExpr 
+    : mulExpr
+    | bitshiftExpr ('<<' | '>>') mulExpr 
+    ;
+
+mulExpr 
+    : unaryExpr 
+    | mulExpr ('*' | '/' | '%') unaryExpr 
+    ;
+
+unaryExpr : ('+' | '-' | '~' | '!')? postfixExpr ;
+
+postfixExpr 
+    : expr 
+    | postfixExpr '[' expr ']'
+    | postfixExpr '(' callArgs? ')'
+    | postfixExpr '.' Ident
+    | postfixExpr '->' Ident
+    ;
+
+atom : assignExpr ;
 
 IntLiteral : (Base10 | Base2 | Base16) Ident? ;
 StringLiteral : Ident? (SingleString | MultiString) ;
