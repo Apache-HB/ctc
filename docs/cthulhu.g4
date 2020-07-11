@@ -84,11 +84,17 @@ expr
     : IntLiteral
     | StringLiteral
     | CharLiteral
+    | closure
+    | coerce
     | qualType 
     | qualType '{' initArgs* '}'
     | '(' atom ')'
     | '{' initArgs? '}'
     ;
+
+coerce : 'coerce' '<' type '>' '(' expr ')' ;
+
+closure : 'a' ;
 
 initArg : expr | '[' expr ']' '=' expr ;
 initArgs : initArg (',' initArg)* ;
