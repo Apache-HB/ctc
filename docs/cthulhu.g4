@@ -94,9 +94,9 @@ callArgs : callArg (',' callArg)* ;
 
 assignExpr : condExpr (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr)* ;
 condExpr : logicExpr ('?' expr? ':' condExpr)? ;
-logicExpr : compareExpr (('&&' | '||') compareExpr)* ;
-compareExpr : equalityExpr (('<=' | '<' | '>=' | '>') equalityExpr)* ;
-equalityExpr : bitwiseExpr (('==' | '!=') bitwiseExpr)*;
+logicExpr : equalityExpr (('&&' | '||') equalityExpr)* ;
+equalityExpr : compareExpr (('==' | '!=') compareExpr)* ;
+compareExpr : bitwiseExpr (('<=' | '<' | '>=' | '>') bitwiseExpr)* ;
 bitwiseExpr : bitshiftExpr (('^' | '|' | '&') bitshiftExpr)* ;
 bitshiftExpr : arithmaticExpr (('<<' | '>>') arithmaticExpr)*;
 arithmaticExpr : mulExpr (('+' | '-') mulExpr)* ;

@@ -4,8 +4,8 @@
 #include <stddef.h>
 
 typedef struct {
-    /* source of the position */
-    struct CtStream* parent;
+    /* filename */
+    const char* name;
 
     /**
      * absolute offset, line, and column
@@ -15,18 +15,6 @@ typedef struct {
     int line;
     int col;
 } CtStreamPos;
-
-/**
- * a range of characters in a source stream
- */
-typedef struct {
-    struct CtStream* parent;
-
-    int pos;
-    int line;
-    int col;
-    int len;
-} CtStreamRange;
 
 typedef struct {
     /* get the next character from a stream, return -1 on EOF */
@@ -127,14 +115,7 @@ typedef struct {
 /* cleanup a token */
 void ctFreeToken(CtToken tok);
 
-CtStream* ctStreamOpen(CtStreamCallbacks callbacks, void* data, const char* path);
-void ctStreamClose(CtStream* self);
-
-typedef struct {
-    char* ptr;
-    size_t alloc;
-    size_t len;
-} CtBuffer;
+CtStream ctStreamOpen(CtStreamCallbacks callbacks, void* data, const char* path);
 
 typedef struct {
     CtStream* stream;
@@ -144,154 +125,39 @@ typedef struct {
 } CtLexer;
 
 /* open a lexing stream */
-CtLexer* ctLexOpen(CtStream* stream);
+CtLexer ctLexOpen(CtStream* stream);
 
 /* get a single token from the stream */
 CtToken ctLexNext(CtLexer* self);
 
-/* cleanup the lexer */
-void ctLexClose(CtLexer* self);
+typedef enum {
+    AK_IDENT
+} CtASTKind;
+
+typedef union {
+    /* AK_IDENT */
+    char* ident;
+} CtASTData;
+
+typedef struct CtAST {
+    CtASTKind kind;
+    CtASTData data;
+
+    /* token related to this ast, used mainly for error reporting */
+    CtToken tok;
+} CtAST;
 
 typedef struct {
     CtLexer* source;
     CtToken tok;
 
+    /* an error message if there is one */
     char* err;
+    /* the current node being parsed */
+    CtAST* node;
 } CtParser;
 
-CtParser* ctParseOpen(CtLexer* source);
+CtParser ctParseOpen(CtLexer* source);
 
-void ctParseClose(CtParser* self);
-
-typedef struct {
-    struct CtAST* items;
-    size_t len;
-    size_t alloc;
-} CtASTList;
-
-typedef enum {
-    /* generic stuff */
-    AK_ERROR,
-    AK_IDENT,
-
-    /* types */
-    AK_PTR_TYPE,
-    AK_REF_TYPE,
-    AK_ARR_TYPE,
-    AK_FUNC_TYPE,
-    AK_QUAL_TYPE,
-    AK_TYPE_ARG,
-    AK_QUAL_TYPE_LIST,
-
-    /* declarations */
-    AK_ALIAS,
-    AK_IMPORT,
-
-
-    AK_UNIT
-} CtASTKind;
-
-typedef struct {
-    CtASTList imports;
-    CtASTList decls;
-} CtASTUnit;
-
-typedef struct {
-    CtASTList path;
-    CtASTList items;
-} CtASTImport;
-
-typedef struct {
-    struct CtAST* name;
-    struct CtAST* symbol;
-} CtASTAlias;
-
-typedef struct {
-    struct CtAST* type;
-    struct CtAST* size;
-} CtASTArrType;
-
-typedef struct {
-    CtASTList args;
-    struct CtAST* result;
-} CtASTFuncType;
-
-typedef struct {
-    struct CtAST* name;
-    struct CtAST* type;
-} CtASTTypeArg;
-
-typedef struct {
-    struct CtAST* name;
-    CtASTList params;
-} CtASTQualType;
-
-typedef union {
-    /* AK_ERROR */
-    char* reason;
-
-    /* AK_ALIAS */
-    CtASTAlias alias;
-
-    /* AK_PTR_TYPE, AK_REF_TYPE */
-    struct CtAST* to;
-
-    /* AK_ARR_TYPE */
-    CtASTArrType arr;
-
-    /* AK_FUNC_TYPE */
-    CtASTFuncType func_type;
-
-    /* AK_TYPE_ARG */
-    CtASTTypeArg type_arg;
-
-    /* AK_QUAL_TYPE */
-    CtASTQualType qual_type;
-
-    /* AK_QUAL_TYPE_LIST */
-    CtASTList types;
-
-    /* AK_IMPORT */
-    CtASTImport include;
-
-    /* AK_UNIT */
-    CtASTUnit unit;
-} CtASTData;
-
-typedef struct CtAST {
-    /* AK_IDENT */
-    CtToken tok;
-    CtASTKind kind;
-    CtASTData data;
-} CtAST;
-
-/* parse a single item using the `interp` rule in cthulhu.g4 */
-CtAST* ctParseNext(CtParser* self);
-
-/* parse a full compilation unit using the `unit` rule in cthulhu.g4 */
-CtAST* ctParseUnit(CtParser* self);
-
-/* cleanup a node */
-void ctFreeAST(CtAST* node);
-
-typedef struct {
-    /* user provided data */
-    void* data;
-} CtInterpData;
-
-typedef struct CtSymbols {
-    /* all the symbols in the current scope */
-    CtASTList symbols;
-} CtSymbols;
-
-/* interpreter */
-typedef struct {
-    /* all the symbols currently available */
-    CtSymbols symbols;
-    CtInterpData userdata;
-} CtInterp;
-
-CtInterp* ctInterpOpen(CtInterpData data);
-void ctInterpClose(CtInterp* self);
 
 #endif /* CTC_H */
