@@ -14,19 +14,25 @@ importSpec : '(' Ident (',' Ident)* ')' ;
 bodyDecl : funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl ;
 
 objectField : (varDecl | aliasDecl | funcDecl) ;
-objectDecl : 'object' Ident '{' objectField* '}' ;
+objectDecl : 'object' Ident templateArgs? '{' objectField* '}' ;
 
 field : Ident ':' type ';' ;
 
-structDecl : 'struct' Ident '{' field* '}' ;
-unionDecl : 'union' Ident '{' field+ '}' ;
+structDecl : 'struct' Ident templateArgs? '{' field* '}' ;
+unionDecl : 'union' Ident templateArgs? '{' field+ '}' ;
 
 enumData : '{' field* '}' ;
 enumField : Ident enumData? ('=' expr)? ;
 enumFields : enumField (',' enumField)* ;
-enumDecl : 'enum' Ident (':' type)? '{' enumFields? '}' ;
+enumDecl : 'enum' Ident templateArgs? (':' type)? '{' enumFields? '}' ;
 
-funcDecl : 'def' funcName funcArgs? funcTail? funcBody ;
+// TODO: allow custom constraints on template args
+templateArg : Ident (':' funcType)? ('=' type)? ;
+templateArgsBody : templateArg (',' templateArg)* ;
+
+templateArgs : '<' templateArgsBody '>' ;
+
+funcDecl : 'def' funcName templateArgs? funcArgs? funcTail? funcBody ;
 funcName : Ident ;
 funcArgs : '(' funcArg (',' funcArg)* ')' ;
 funcArg : Ident ':' type ('=' expr)? ;
@@ -37,7 +43,7 @@ varDecl : 'var' varNames ('=' expr) ';' ;
 varName : Ident (':' type) ;
 varNames : varName | '[' varName (',' varName)* ']' ;
 
-aliasDecl : 'alias' Ident '=' aliasBody ';' ;
+aliasDecl : 'alias' Ident templateArgs? '=' aliasBody ';' ;
 aliasBody : type ;
 
 stmt : stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | expr ';' | ';' ;
@@ -53,13 +59,7 @@ returnStmt : 'return' expr? ';' ;
 
 stmtList : '{' stmt* '}' ;
 
-type
-    : qualType
-    | ptrType
-    | refType
-    | arrType
-    | funcType
-    ;
+type : qualType | ptrType | refType | arrType | funcType ;
 
 // so we use < and > for templates
 // this leads to some ambiguity with >> on closing templates

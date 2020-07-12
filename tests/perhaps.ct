@@ -6,15 +6,18 @@ import std::types(char, u32);
 
 alias str = *const<char>;
 
-def loop<T>(range: &const<vec<T>>) {
+def for_each<T, F: def(T)>(range: &const<vec<T>>, func: F = rt::print) {
     for each <| range.iter()
-        rt::print(each.to_string());
+        func(each);
 }
 
 def main {
     var [argc: u32, argv: *str] = rt::sys::args();
     var arg_vec = rt::vec<str>::new(argv, argc);
-    loop<str>(arg_vec);
+
+    for_each(arg_vec, def (it) {
+        rt::print(it);
+    });
 }
 
 alias ivec = Vector<i32, :alloc = GlobalAlloc<i32>>;
