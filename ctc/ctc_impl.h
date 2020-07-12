@@ -886,8 +886,6 @@ static int parseExpectKey(CtParser* self, CtKeyword key)
     if (tok.kind != TK_KEYWORD || tok.data.key != key)
     {
         self->tok = tok;
-        printf("oh no\n");
-        /* TODO: error */
         return 0;
     }
 
@@ -968,7 +966,6 @@ static void astListAdd(CtASTList* self, CtAST* node)
     self->items[self->len++] = *node;
 }
 
-#define PARSE_ERR_FMT(token, fmt, ...) { CtAST* err = astNew(AK_ERROR); err->tok = token; CT_FMT_ARGS(err->data.reason, fmt, __VA_ARGS__); return err; }
 #define PARSE_ERR(token, fmt) { CtAST* err = astNew(AK_ERROR); err->tok = token; err->data.reason = cstrdup(fmt); return err; }
 
 static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep, CtKeyword end, int* err)
@@ -976,12 +973,13 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
     if (parseConsumeKey(self, end))
         return astListEmpty();
 
-    CtASTList parts = astListNew(func(self));
+    CtASTList parts = astListNew(NULL);
 
-    while (parseConsumeKey(self, sep))
+    do
     {
         astListAdd(&parts, func(self));
     }
+    while (parseConsumeKey(self, sep));
 
     if (end != K_INVALID && !parseExpectKey(self, end))
     {

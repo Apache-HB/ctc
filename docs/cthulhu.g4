@@ -110,13 +110,8 @@ compareExpr
     ;
 
 equalityExpr
-    : arithmaticExpr
-    | equalityExpr ('==' | '!=') arithmaticExpr
-    ;
-
-arithmaticExpr
     : bitwiseExpr
-    | arithmaticExpr ('+' | '-') bitwiseExpr
+    | equalityExpr ('==' | '!=') bitwiseExpr
     ;
 
 bitwiseExpr
@@ -125,8 +120,13 @@ bitwiseExpr
     ;
 
 bitshiftExpr
+    : arithmaticExpr
+    | bitshiftExpr ('<<' | '>>') arithmaticExpr
+    ;
+
+arithmaticExpr
     : mulExpr
-    | bitshiftExpr ('<<' | '>>') mulExpr
+    | arithmaticExpr ('+' | '-') bitwiseExpr
     ;
 
 mulExpr

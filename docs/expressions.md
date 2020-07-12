@@ -6,9 +6,9 @@ From highest to lowest. operators with the same precedence level are evaluated f
 
 1. Unary `~`, `!`, `*`, `&`
 2. Binary `*`, `/`, `%`
-3. Binary `<<`, `>>`
-4. Binary `^`, `|`, `&`
-5. Binary `+`, `-`
+3. Binary `+`, `-`
+4. Binary `<<`, `>>`
+5. Binary `^`, `|`, `&`
 6. Binary `==`, `!=`
 7. Binary `<`, `<=`, `>=`, `>`
 8. Binary `&&`, `||`
