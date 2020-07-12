@@ -172,7 +172,38 @@ typedef enum {
     /* AK_PATH AK_PATH? */
     AK_IMPORT,
 
-    AK_UNIT
+    AK_ALIAS,
+    AK_FUNCTION,
+    AK_OBJECT,
+    AK_VARIABLE,
+    AK_STRUCT,
+    AK_UNION,
+    AK_ENUM,
+
+    /* AK_ARRAY<AK_IMPORT> AK_ARRAY<...> */
+    AK_UNIT,
+
+    /* expressions and statements */
+
+    AK_LITERAL,
+    AK_PAREN,
+    AK_UNARY,
+    AK_BINARY,
+    AK_TERNARY,
+    AK_INIT,
+    AK_COERCE,
+    AK_CLOSURE,
+    AK_ACCESS,
+    AK_DEREF,
+    AK_CALL,
+    AK_SUBSCRIPT,
+
+    AK_FOR,
+    AK_RANGE,
+    AK_WHILE,
+    AK_RETURN,
+    AK_IF,
+    AK_STMTLIST
 } CtASTKind;
 
 typedef struct {
@@ -222,6 +253,12 @@ typedef struct {
 } CtASTImport;
 
 typedef struct {
+    struct CtAST* name;
+    struct CtAST* params;
+    struct CtAST* body;
+} CtASTAlias;
+
+typedef struct {
     /* AK_ARRAY<AK_IMPORT> */
     struct CtAST* imports;
 
@@ -262,6 +299,20 @@ typedef union {
 
     /* AK_IMPORT */
     CtASTImport include;
+
+    CtASTAlias alias;
+
+    CtASTFunction func;
+
+    CtASTObject object;
+
+    CtASTVariable var;
+
+    CtASTStruct struc;
+
+    CtASTUnion uni;
+
+    CtASTEnum enu;
 
     /* AK_UNIT */
     CtASTUnit unit;
