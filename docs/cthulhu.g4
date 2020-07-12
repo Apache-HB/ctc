@@ -92,48 +92,15 @@ initArgs : initArg (',' initArg)* ;
 callArg : expr | '[' Ident ']' '=' expr ;
 callArgs : callArg (',' callArg)* ;
 
-assignExpr
-    : condExpr
-    | assignExpr ('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr
-    ;
-
+assignExpr : condExpr (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr)* ;
 condExpr : logicExpr ('?' expr? ':' condExpr)? ;
-
-logicExpr
-    : compareExpr
-    | logicExpr ('&&' | '||') compareExpr
-    ;
-
-compareExpr
-    : equalityExpr
-    | compareExpr ('<=' | '<' | '>=' | '>') equalityExpr
-    ;
-
-equalityExpr
-    : bitwiseExpr
-    | equalityExpr ('==' | '!=') bitwiseExpr
-    ;
-
-bitwiseExpr
-    : bitshiftExpr
-    | bitwiseExpr ('^' | '|' | '&') bitshiftExpr
-    ;
-
-bitshiftExpr
-    : arithmaticExpr
-    | bitshiftExpr ('<<' | '>>') arithmaticExpr
-    ;
-
-arithmaticExpr
-    : mulExpr
-    | arithmaticExpr ('+' | '-') bitwiseExpr
-    ;
-
-mulExpr
-    : unaryExpr
-    | mulExpr ('*' | '/' | '%') unaryExpr
-    ;
-
+logicExpr : compareExpr (('&&' | '||') compareExpr)* ;
+compareExpr : equalityExpr (('<=' | '<' | '>=' | '>') equalityExpr)* ;
+equalityExpr : bitwiseExpr (('==' | '!=') bitwiseExpr)*;
+bitwiseExpr : bitshiftExpr (('^' | '|' | '&') bitshiftExpr)* ;
+bitshiftExpr : arithmaticExpr (('<<' | '>>') arithmaticExpr)*;
+arithmaticExpr : mulExpr (('+' | '-') mulExpr)* ;
+mulExpr : unaryExpr (('*' | '/' | '%') unaryExpr)*;
 unaryExpr : ('+' | '-' | '~' | '!')? postfixExpr ;
 
 postfixExpr
