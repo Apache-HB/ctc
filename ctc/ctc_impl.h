@@ -21,7 +21,7 @@
 
 #ifndef CT_SPRINTF
 #   include "printf/printf.c"
-#   define CT_SPRINTF sprintf_
+#   define CT_SPRINTF sprintf__
 #endif
 
 #ifndef CT_ERROR
@@ -830,6 +830,11 @@ static CtAST* astNew(CtASTKind kind)
     return self;
 }
 
+static void astFree(CtAST node)
+{
+    (void)node;
+}
+
 static CtToken parseNext(CtParser* self)
 {
     CtToken tok = self->tok;
@@ -856,19 +861,6 @@ static int parseConsumeKey(CtParser* self, CtKeyword key)
     return 0;
 }
 
-static int parseExpect(CtParser* self, CtTokenKind kind)
-{
-    CtToken tok = parseNext(self);
-
-    if (tok.kind != kind)
-    {
-        self->tok = tok;
-        return 0;
-    }
-
-    return 1;
-}
-
 static int parsePeek(CtParser* self, CtTokenKind kind)
 {
     CtToken tok = parseNext(self);
@@ -893,6 +885,7 @@ static int parseExpectKey(CtParser* self, CtKeyword key)
 
     if (tok.kind != TK_KEYWORD || tok.data.key != key)
     {
+        self->tok = tok;
         printf("oh no\n");
         /* TODO: error */
         return 0;
@@ -952,6 +945,15 @@ static CtASTList astListEmpty()
     return list;
 }
 
+static void astListFree(CtASTList self)
+{
+    for (size_t i = 0; i < self.len; i++)
+    {
+        astFree(self.items[i]);
+    }
+    CT_FREE(self.items);
+}
+
 static void astListAdd(CtASTList* self, CtAST* node)
 {
     if (self->len >= self->alloc)
@@ -966,7 +968,10 @@ static void astListAdd(CtASTList* self, CtAST* node)
     self->items[self->len++] = *node;
 }
 
-static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep, CtKeyword end)
+#define PARSE_ERR_FMT(token, fmt, ...) { CtAST* err = astNew(AK_ERROR); err->tok = token; CT_FMT_ARGS(err->data.reason, fmt, __VA_ARGS__); return err; }
+#define PARSE_ERR(token, fmt) { CtAST* err = astNew(AK_ERROR); err->tok = token; err->data.reason = cstrdup(fmt); return err; }
+
+static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword sep, CtKeyword end, int* err)
 {
     if (parseConsumeKey(self, end))
         return astListEmpty();
@@ -978,8 +983,12 @@ static CtASTList parseCollect(CtParser* self, CtAST*(*func)(CtParser*), CtKeywor
         astListAdd(&parts, func(self));
     }
 
-    if (end != K_INVALID)
-        parseExpectKey(self, end);
+    if (end != K_INVALID && !parseExpectKey(self, end))
+    {
+        astListFree(parts);
+        if (err)
+            *err = 1;
+    }
 
     return parts;
 }
@@ -990,61 +999,64 @@ static CtAST* parseExpr(CtParser* self);
 static CtAST* parseType(CtParser* self);
 static CtAST* parseQualType(CtParser* self);
 
+/* operator precedence from lowest to highest */
+typedef enum {
+    P_ASSIGN = 0,
+    P_LOGIC = 1,
+    P_COMPARE = 2,
+    P_EQUALITY = 3,
+    P_ADD = 4,
+    P_BITWISE = 5,
+    P_BITSHIFT = 6,
+    P_MUL = 7,
 
-
-static CtAST* parseUnary(CtParser* self)
+    /* special cases */
+    P_TERNARY,
+    P_ERROR
+} CtPrec;
+/*
+static CtPrec binopPrec(CtKeyword key)
 {
+    switch (key)
+    {
+    case K_ASSIGN: case K_ADDEQ: case K_SUBEQ:
+    case K_DIVEQ: case K_MODEQ: case K_MULEQ:
+    case K_SHLEQ: case K_SHREQ: case K_BITXOREQ:
+    case K_BITANDEQ: case K_BITOREQ:
+        return P_ASSIGN;
+    case K_QUESTION:
+        return P_TERNARY;
+    case K_AND: case K_OR:
+        return P_LOGIC;
+    case K_GT: case K_GTE: case K_LT: case K_LTE:
+        return P_COMPARE;
+    case K_EQ: case K_NEQ:
+        return P_EQUALITY;
+    case K_ADD: case K_SUB:
+        return P_ADD;
+    case K_SHL: case K_SHR:
+        return P_BITSHIFT;
+    case K_BITXOR: case K_BITAND: case K_BITOR:
+        return P_BITWISE;
+    case K_MUL: case K_MOD: case K_DIV:
+        return P_MUL;
+    default:
+        return P_ERROR;
+    }
+}*/
 
-}
-
-static CtAST* parseMul(CtParser* self)
-{
-
-}
-
-static CtAST* parseBitshift(CtParser* self)
-{
-
-}
-
-static CtAST* parseBitwise(CtParser* self)
-{
-
-}
-
-static CtAST* parseMath(CtParser* self)
-{
-
-}
-
-static CtAST* parseEquality(CtParser* self)
-{
-
-}
-
-static CtAST* parseCompare(CtParser* self)
-{
-
-}
-
-static CtAST* parseLogic(CtParser* self)
-{
-
-}
-
-static CtAST* parseTernary(CtParser* self)
-{
-
-}
-
-static CtAST* parseAssign(CtParser* self)
-{
-
-}
+#define IS_UNARY(key) (key == K_ADD || key == K_SUB || key == K_MUL || key == K_BITAND)
 
 static CtAST* parseExpr(CtParser* self)
 {
+    (void)self;
+    return NULL;
+}
 
+static CtAST* parseStmt(CtParser* self)
+{
+    (void)self;
+    return NULL;
 }
 
 static CtAST* parsePtrType(CtParser* self)
@@ -1069,7 +1081,12 @@ static CtAST* parseArrType(CtParser* self)
 {
     CtAST* body = parseType(self);
     CtAST* size = parseConsumeKey(self, K_COLON) ? parseExpr(self) : NULL;
-    parseExpectKey(self, K_RSQUARE);
+    if (!parseExpectKey(self, K_RSQUARE))
+    {
+        ctFreeAST(body);
+        ctFreeAST(size);
+        PARSE_ERR(parseNext(self), "missing closing ] when parsing array type")
+    }
 
     CtAST* arr = astNew(AK_ARR_TYPE);
     arr->data.arr.type = body;
@@ -1078,14 +1095,22 @@ static CtAST* parseArrType(CtParser* self)
     return arr;
 }
 
-static CtASTList parseFuncTypeArgs(CtParser* self)
+static CtASTList parseFuncTypeArgs(CtParser* self, int* err)
 {
-    return parseCollect(self, parseType, K_COMMA, K_RPAREN);
+    return parseCollect(self, parseType, K_COMMA, K_RPAREN, err);
 }
 
 static CtAST* parseFuncType(CtParser* self)
 {
-    CtASTList args = parseConsumeKey(self, K_LPAREN) ? parseFuncTypeArgs(self) : astListEmpty();
+    int error = 0;
+    CtASTList args = parseConsumeKey(self, K_LPAREN) ? parseFuncTypeArgs(self, &error) : astListEmpty();
+
+    if (error)
+    {
+        astListFree(args);
+        PARSE_ERR(parseNext(self), "unexpected token in function parameters")
+    }
+
     CtAST* result = parseConsumeKey(self, K_ARROW) ? parseType(self) : NULL;
 
     CtAST* func = astNew(AK_FUNC_TYPE);
@@ -1101,7 +1126,11 @@ static CtAST* parseQualTypeArg(CtParser* self)
     if (parseConsumeKey(self, K_COLON))
     {
         name = parseExpectIdent(self);
-        parseExpectKey(self, K_ASSIGN);
+        if (!parseExpectKey(self, K_ASSIGN))
+        {
+            ctFreeAST(name);
+            PARSE_ERR(parseNext(self), "missing `=` when parsing named template argument")
+        }
     }
     else
     {
@@ -1117,12 +1146,12 @@ static CtAST* parseQualTypeArg(CtParser* self)
     return arg;
 }
 
-static CtASTList parseQualTypeArgs(CtParser* self)
+static CtASTList parseQualTypeArgs(CtParser* self, int* error)
 {
     CtASTList args;
 
     IN_TEMPLATE(self, {
-        args = parseCollect(self, parseQualTypeArg, K_COMMA, K_GT);
+        args = parseCollect(self, parseQualTypeArg, K_COMMA, K_GT, error);
     })
 
     return args;
@@ -1130,8 +1159,15 @@ static CtASTList parseQualTypeArgs(CtParser* self)
 
 static CtAST* parseQualTypeItem(CtParser* self)
 {
+    int error = 0;
     CtAST* part = parseExpectIdent(self);
-    CtASTList params = parseConsumeKey(self, K_LT) ? parseQualTypeArgs(self) : astListEmpty();
+    CtASTList params = parseConsumeKey(self, K_LT) ? parseQualTypeArgs(self, &error) : astListEmpty();
+
+    if (error)
+    {
+        ctFreeAST(part);
+        PARSE_ERR(parseNext(self), "unexpected token encountered when parsing type parameters")
+    }
 
     CtAST* qual = astNew(AK_QUAL_TYPE);
     qual->data.qual_type.name = part;
@@ -1142,7 +1178,11 @@ static CtAST* parseQualTypeItem(CtParser* self)
 
 static CtAST* parseQualType(CtParser* self)
 {
-    CtASTList parts = parseCollect(self, parseQualTypeItem, K_COLON2, K_INVALID);
+    int error = 0;
+    CtASTList parts = parseCollect(self, parseQualTypeItem, K_COLON2, K_INVALID, &error);
+
+    if (error)
+        PARSE_ERR(parseNext(self), "unexpected token encountered while parsing type parameters")
 
     CtAST* type = astNew(AK_QUAL_TYPE_LIST);
     type->data.types = parts;
@@ -1174,8 +1214,7 @@ static CtAST* parseType(CtParser* self)
     }
     else
     {
-        /* error */
-        return NULL;
+        PARSE_ERR(parseNext(self), "unexpected token encountered when parsing type")
     }
 }
 
@@ -1188,7 +1227,12 @@ static CtAST* parseAliasBody(CtParser* self)
 static CtAST* parseAlias(CtParser* self)
 {
     CtAST* name = parseExpectIdent(self);
-    parseExpectKey(self, K_ASSIGN);
+    if (!parseExpectKey(self, K_ASSIGN))
+    {
+        ctFreeAST(name);
+        PARSE_ERR(parseNext(self), "expected `=` when parsing alias")
+    }
+
     CtAST* symbol = parseAliasBody(self);
 
     CtAST* alias = astNew(AK_ALIAS);
@@ -1206,8 +1250,33 @@ static CtAST* parseBody(CtParser* self)
     }
     else
     {
-        return NULL;
+        PARSE_ERR(parseNext(self), "unexpected toplevel token")
     }
+}
+
+static CtAST* parseImport(CtParser* self)
+{
+    int error = 0;
+    CtASTList parts = parseCollect(self, parseExpectIdent, K_COLON2, K_INVALID, NULL);
+    CtASTList items = parseConsumeKey(self, K_LPAREN) ? parseCollect(self, parseExpectIdent, K_COMMA, K_RPAREN, &error) : astListEmpty();
+
+    if (error)
+    {
+        astListFree(parts);
+        PARSE_ERR(parseNext(self), "missing ) when parsing import symbols")
+    }
+
+    if (!parseExpectKey(self, K_SEMI))
+    {
+        astListFree(parts);
+        PARSE_ERR(parseNext(self), "unexpected token when parsing import")
+    }
+
+    CtAST* node = astNew(AK_IMPORT);
+    node->data.include.path = parts;
+    node->data.include.items = items;
+
+    return node;
 }
 
 /**
@@ -1328,12 +1397,47 @@ void ctParseClose(CtParser* self)
 
 CtAST* ctParseNext(CtParser* self)
 {
+    CtAST* node;
+    if (parseConsumeKey(self, K_IMPORT))
+    {
+        node = parseImport(self);
+    }
+    else
+    {
+        node = parseBody(self);
+    }
 
+    if (!node)
+        node = parseStmt(self);
+
+    return node;
 }
 
 CtAST* ctParseUnit(CtParser* self)
 {
+    CtASTList imports = astListNew(NULL);
+    while (parseConsumeKey(self, K_IMPORT))
+    {
+        astListAdd(&imports, parseImport(self));
+    }
 
+    CtASTList body = astListNew(NULL);
+
+    for (;;)
+    {
+        CtAST* decl = parseBody(self);
+
+        if (!decl)
+            break;
+
+        astListAdd(&body, decl);
+    }
+
+    CtAST* unit = astNew(AK_UNIT);
+    unit->data.unit.imports = imports;
+    unit->data.unit.decls = body;
+
+    return unit;
 }
 
 void ctFreeAST(CtAST* node)
@@ -1347,12 +1451,6 @@ CtInterp* ctInterpOpen(CtInterpData data)
     self->userdata = data;
 
     return self;
-}
-
-void ctInterpEval(CtInterp* self, CtAST* node)
-{
-    (void)self;
-    (void)node;
 }
 
 void ctInterpClose(CtInterp* self)

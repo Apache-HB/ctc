@@ -183,30 +183,23 @@ typedef enum {
     AK_TYPE_ARG,
     AK_QUAL_TYPE_LIST,
 
-    /* expressions */
-    AK_COERCE,
-    AK_UNARY,
-
-    /* string, char, or int */
-    AK_LITERAL,
-
-    /* qualType init? */
-    AK_ATOM,
-
-    /* (expr) */
-    AK_PAREN,
-
-    /* { initArgs } */
-    AK_INIT,
-
-    AK_TERNARY,
-
-    /* ([expr] =)? expr */
-    AK_INIT_ARG,
-
     /* declarations */
-    AK_ALIAS
+    AK_ALIAS,
+    AK_IMPORT,
+
+
+    AK_UNIT
 } CtASTKind;
+
+typedef struct {
+    CtASTList imports;
+    CtASTList decls;
+} CtASTUnit;
+
+typedef struct {
+    CtASTList path;
+    CtASTList items;
+} CtASTImport;
 
 typedef struct {
     struct CtAST* name;
@@ -233,38 +226,6 @@ typedef struct {
     CtASTList params;
 } CtASTQualType;
 
-typedef struct {
-    struct CtAST* type;
-    struct CtAST* expr;
-} CtASTCoerce;
-
-typedef struct {
-    struct CtAST* body;
-    CtASTList init;
-} CtASTAtom;
-
-typedef struct {
-    struct CtAST* slot;
-    struct CtAST* expr;
-} CtASTInitArg;
-
-typedef struct {
-    struct CtAST* cond;
-
-    /**
-     * if truthy is NULL then its a cond ?: expr
-     * this means that cond is evaluated, then if cond is false
-     * falsey is evaluated, otherwise the ternary evaluates to cond
-     *
-     * basically shorthand for
-     *
-     * expr = cond ? cond : falsey;
-     */
-
-    struct CtAST* truthy;
-    struct CtAST* falsey;
-} CtASTTernary;
-
 typedef union {
     /* AK_ERROR */
     char* reason;
@@ -290,24 +251,11 @@ typedef union {
     /* AK_QUAL_TYPE_LIST */
     CtASTList types;
 
-    /* AK_COERCE */
-    CtASTCoerce coerce;
+    /* AK_IMPORT */
+    CtASTImport include;
 
-    /* AK_PAREN */
-    /* AK_UNARY, the unary operator is stored in tok */
-    struct CtAST* body;
-
-    /* AK_ATOM */
-    CtASTAtom atom;
-
-    /* AK_INIT_ARG */
-    CtASTInitArg init_arg;
-
-    /* AK_TERNARY */
-    CtASTTernary ternary;
-
-    /* AK_INIT */
-    CtASTList fields;
+    /* AK_UNIT */
+    CtASTUnit unit;
 } CtASTData;
 
 typedef struct CtAST {
@@ -344,7 +292,6 @@ typedef struct {
 } CtInterp;
 
 CtInterp* ctInterpOpen(CtInterpData data);
-void ctInterpEval(CtInterp* self, CtAST* ast);
 void ctInterpClose(CtInterp* self);
 
 #endif /* CTC_H */

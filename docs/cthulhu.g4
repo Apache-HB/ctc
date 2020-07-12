@@ -80,17 +80,7 @@ funcTypeArgs : '(' typeList? ')' ;
 funcTypeResult : '->' type ;
 funcType : 'def' funcTypeArgs? funcTypeResult? ;
 
-expr
-    : IntLiteral
-    | StringLiteral
-    | CharLiteral
-    | closure
-    | coerce
-    | qualType 
-    | qualType '{' initArgs* '}'
-    | '(' atom ')'
-    | '{' initArgs? '}'
-    ;
+expr : assignExpr ;
 
 coerce : 'coerce' '<' type '>' '(' expr ')' ;
 
@@ -102,59 +92,69 @@ initArgs : initArg (',' initArg)* ;
 callArg : expr | '[' Ident ']' '=' expr ;
 callArgs : callArg (',' callArg)* ;
 
-assignExpr 
-    : condExpr 
-    | assignExpr ('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr 
+assignExpr
+    : condExpr
+    | assignExpr ('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr
     ;
 
 condExpr : logicExpr ('?' expr? ':' condExpr)? ;
 
-logicExpr 
-    : compareExpr 
-    | logicExpr ('&&' | '||') compareExpr 
+logicExpr
+    : compareExpr
+    | logicExpr ('&&' | '||') compareExpr
     ;
 
-compareExpr 
-    : equalityExpr 
-    | compareExpr ('<=' | '<' | '>=' | '>') equalityExpr 
+compareExpr
+    : equalityExpr
+    | compareExpr ('<=' | '<' | '>=' | '>') equalityExpr
     ;
 
-equalityExpr 
+equalityExpr
     : arithmaticExpr
-    | equalityExpr ('==' | '!=') arithmaticExpr 
+    | equalityExpr ('==' | '!=') arithmaticExpr
     ;
 
-arithmaticExpr 
-    : bitwiseExpr 
-    | arithmaticExpr ('+' | '-') bitwiseExpr 
+arithmaticExpr
+    : bitwiseExpr
+    | arithmaticExpr ('+' | '-') bitwiseExpr
     ;
 
-bitwiseExpr 
-    : bitshiftExpr 
-    | bitwiseExpr ('^' | '|' | '&') bitshiftExpr 
+bitwiseExpr
+    : bitshiftExpr
+    | bitwiseExpr ('^' | '|' | '&') bitshiftExpr
     ;
 
-bitshiftExpr 
+bitshiftExpr
     : mulExpr
-    | bitshiftExpr ('<<' | '>>') mulExpr 
+    | bitshiftExpr ('<<' | '>>') mulExpr
     ;
 
-mulExpr 
-    : unaryExpr 
-    | mulExpr ('*' | '/' | '%') unaryExpr 
+mulExpr
+    : unaryExpr
+    | mulExpr ('*' | '/' | '%') unaryExpr
     ;
 
 unaryExpr : ('+' | '-' | '~' | '!')? postfixExpr ;
 
-postfixExpr 
-    : expr 
+postfixExpr
+    : primary
     | postfixExpr '[' expr ']'
     | postfixExpr '(' callArgs? ')'
     | postfixExpr '.' Ident
     | postfixExpr '->' Ident
     ;
 
-atom : assignExpr ;
+primary
+    : '(' expr ')'
+    | IntLiteral
+    | CharLiteral
+    | StringLiteral
+    | closure
+    | coerce
+    | qualType
+    | qualType '{' initArgs? '}'
+    | '{' initArgs? '}'
+    ;
 
 IntLiteral : (Base10 | Base2 | Base16) Ident? ;
 StringLiteral : Ident? (SingleString | MultiString) ;

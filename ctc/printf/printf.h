@@ -42,7 +42,7 @@
  * \param format A string that specifies the format of the output
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
-#define sprintf sprintf_
-int sprintf_(char* buffer, const char* format, ...);
+#define sprintf sprintf__
+int sprintf__(char* buffer, const char* format, ...);
 
 #endif  // _PRINTF_H_

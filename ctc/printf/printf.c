@@ -562,7 +562,7 @@ static size_t _etoa(out_fct_type out, char* buffer, size_t idx, size_t maxlen, d
 
 
 // internal vsnprintf
-static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const char* format, va_list va)
+static int m_vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const char* format, va_list va)
 {
   unsigned int flags, width, precision, n;
   size_t idx = 0U;
@@ -844,11 +844,11 @@ static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const
   return (int)idx;
 }
 
-int sprintf_(char* buffer, const char* format, ...)
+int sprintf__(char* buffer, const char* format, ...)
 {
   va_list va;
   va_start(va, format);
-  const int ret = _vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
+  const int ret = m_vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
   va_end(va);
   return ret;
 }

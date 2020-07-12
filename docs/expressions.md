@@ -18,7 +18,7 @@ From highest to lowest. operators with the same precedence level are evaluated f
 
 ## Casting
 
-Casting as seen in many other languages like C or D is a foreign concept to cthulhu. as we aim for 0 overhead and little UB adding consistent casting rules would be difficult. to this end cthulhu supports type coercion instead. simmilar to `reinterpret_cast` from C++. this is named the `coerce` keyword. when `coerce`ing a value to another type, a few requirements must be met.
+Casting as seen in many other languages like C or D is a foreign concept to cthulhu. as we aim for 0 overhead and little UB adding consistent casting rules would be difficult. to this end cthulhu supports type coercion similar to `reinterpret_cast` from C++. this is named the `coerce` keyword. when `coerce`ing a value to another type, a few requirements must be met.
 
 ```ct
 val i = coerce<i32>(100u32);
