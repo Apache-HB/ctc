@@ -40,7 +40,7 @@ varNames : varName | '[' varName (',' varName)* ']' ;
 aliasDecl : 'alias' Ident '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | funcDecl | expr ';' | ';' ;
+stmt : stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | expr ';' | ';' ;
 
 // we use <| to solve some abiguity with varNames
 forStmt : 'for' varNames '<|' expr stmt ;
@@ -84,7 +84,9 @@ expr : assignExpr ;
 
 coerce : 'coerce' '<' type '>' '(' expr ')' ;
 
-closure : 'a' ;
+captureBody : '=' | '&' | qualType (',' qualType)* ;
+captures : '[' captureBody ']' ;
+closure : 'def' funcArgs? captures? funcTail? stmtList ;
 
 initArg : expr | '[' expr ']' '=' expr ;
 initArgs : initArg (',' initArg)* ;
@@ -92,8 +94,8 @@ initArgs : initArg (',' initArg)* ;
 callArg : expr | '[' Ident ']' '=' expr ;
 callArgs : callArg (',' callArg)* ;
 
-assignExpr : condExpr (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') condExpr)* ;
-condExpr : logicExpr ('?' expr? ':' condExpr)? ;
+assignExpr : logicExpr (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') logicExpr)* ;
+condExpr : logicExpr ('?' primary ':' condExpr)? ;
 logicExpr : equalityExpr (('&&' | '||') equalityExpr)* ;
 equalityExpr : compareExpr (('==' | '!=') compareExpr)* ;
 compareExpr : bitwiseExpr (('<=' | '<' | '>=' | '>') bitwiseExpr)* ;

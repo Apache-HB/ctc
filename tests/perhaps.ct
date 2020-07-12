@@ -15,24 +15,6 @@ def main {
     var [argc: u32, argv: *str] = rt::sys::args();
     var arg_vec = rt::vec<str>::new(argv, argc);
     loop<str>(arg_vec);
-
-    # we need lambdas of some sort
-    # they need to support captures
-    # we cant use (args) to start with because (expr)
-    # we cant use [captures] to start with because [expr] = expr in params
-    # we cant use { args -> body } to start with because stmtList = { stmt* }
-    # we cant use &(args) because &expr unary
-    # maybe ^(args) [cpatures] -> result body kinda like clang blocks
-    # maybe :[captures] (args) -> result body
-    # maybe |captures| (args) -> result body
-    #   - || would be a special case
-    #   - is still only 2 characters to denote a lambda
-    #   - kinda ugly but maybe good enough
-    # maybe def (args) [captures] -> result body
-    var l1 = () => 5;
-    let l2 = () { return 5; };
-    let l3 = () <| 5;
-    let l4 = () [] -> type { };
 }
 
 alias ivec = Vector<i32, :alloc = GlobalAlloc<i32>>;
