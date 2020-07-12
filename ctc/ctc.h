@@ -131,12 +131,140 @@ CtLexer ctLexOpen(CtStream* stream);
 CtToken ctLexNext(CtLexer* self);
 
 typedef enum {
-    AK_IDENT
+    /* a single identifier */
+    AK_IDENT,
+
+    /* an array of asts */
+    AK_ARRAY,
+
+    /* types */
+
+    /* AK_QUAL_TYPES | AK_PTR | AK_REF | AK_ARR | AK_FUNC_TYPE */
+    /* AK_TYPE */
+
+    /* AK_IDENT ('<' AK_TYPE_ARGS '>')? */
+    AK_QUAL,
+
+    /* '*' AK_TYPE */
+    AK_PTR,
+
+    /* '&' AK_TYPE */
+    AK_REF,
+
+    /* '[' AK_TYPE (':' AK_EXPR)? ']' */
+    AK_ARR,
+
+    /* 'def' AK_TYPES? ('->' AK_TYPE)? */
+    AK_FUNC_TYPE,
+
+    /* AK_TYPE | ':' AK_IDENT '=' AK_TYPE */
+    AK_TYPE_ARG,
+
+    /* a flat array of types */
+    /* AK_TYPE_ARG (',' AK_TYPE_ARG)* */
+    AK_TYPE_ARGS,
+
+    /* AK_QUAL ('::' AK_QUAL)* */
+    AK_QUAL_TYPES,
+
+    /* toplevel declarations */
+
+    /* AK_PATH AK_PATH? */
+    AK_IMPORT,
+
+    AK_UNIT
 } CtASTKind;
+
+typedef struct {
+    struct CtAST* data;
+    size_t alloc;
+    size_t len;
+} CtASTArray;
+
+typedef struct {
+    /* AK_IDENT */
+    struct CtAST* name;
+
+    /* AK_TYPE_ARGS? */
+    struct CtAST* params;
+} CtASTQualType;
+
+typedef struct {
+    /* AK_TYPE */
+    struct CtAST* type;
+
+    /* AK_EXPR? */
+    struct CtAST* size;
+} CtASTTypeArray;
+
+typedef struct {
+    /* AK_TYPES? */
+    struct CtAST* args;
+
+    /* AK_TYPE? */
+    struct CtAST* result;
+} CtASTFuncType;
+
+typedef struct {
+    /* AK_IDENT? */
+    struct CtAST* name;
+
+    /* AK_TYPE */
+    struct CtAST* type;
+} CtASTTypeArg;
+
+typedef struct {
+    /* AK_ARRAY<AK_IDENT> */
+    struct CtAST* path;
+
+    /* AK_ARRAY<AK_IDENT> */
+    struct CtAST* items;
+} CtASTImport;
+
+typedef struct {
+    /* AK_ARRAY<AK_IMPORT> */
+    struct CtAST* imports;
+
+    /* AK_ARRAY<AK_ALIAS | AK_STRUCT | AK_UNION | AK_FUNCTION> */
+    struct CtAST* body;
+} CtASTUnit;
 
 typedef union {
     /* AK_IDENT */
     char* ident;
+
+    /* AK_ARRAY */
+    CtASTArray array;
+
+    /* AK_QUAL */
+    CtASTQualType qual_type;
+
+    /* AK_PTR */
+    struct CtAST* ptr;
+
+    /* AK_REF */
+    struct CtAST* ref;
+
+    /* AK_ARR */
+    CtASTTypeArray arr;
+
+    /* AK_FUNC_TYPE */
+    CtASTFuncType func_type;
+
+    /* AK_TYPE_ARG */
+    CtASTTypeArg type_arg;
+
+    /* AK_TYPE_ARGS */
+    CtASTArray type_args;
+
+    /* AK_QUAL_TYPES */
+    CtASTArray qual_types;
+
+    /* AK_IMPORT */
+    CtASTImport include;
+
+    /* AK_UNIT */
+    CtASTUnit unit;
 } CtASTData;
 
 typedef struct CtAST {

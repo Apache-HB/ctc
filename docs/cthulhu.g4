@@ -59,7 +59,7 @@ returnStmt : 'return' expr? ';' ;
 
 stmtList : '{' stmt* '}' ;
 
-type : qualType | ptrType | refType | arrType | funcType ;
+type : qualTypes | ptrType | refType | arrType | funcType ;
 
 // so we use < and > for templates
 // this leads to some ambiguity with >> on closing templates
@@ -69,7 +69,8 @@ type : qualType | ptrType | refType | arrType | funcType ;
 // since Ident is a valid typename and lookahead is painful
 typeArg : type | ':' Ident '=' type ;
 typeArgs : '<' typeArg (',' typeArg)* '>' ;
-qualType : Ident typeArgs? ('::' qualType)* ;
+qualType : Ident typeArgs? ;
+qualTypes : qualType ('::' qualType)* ;
 
 arrType : '[' type (':' expr)? ']' ;
 ptrType : '*' type ;
