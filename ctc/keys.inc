@@ -55,8 +55,6 @@ KEY(K_DO, "do")
 KEY(K_IS, "is")
 KEY(K_AS, "as")
 KEY(K_IN, "in")
-KEY(K_CONST, "const")
-KEY(K_MUT, "mut")
 KEY(K_LOOP, "loop")
 
 /* math operators */

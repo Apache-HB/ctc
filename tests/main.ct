@@ -1,5 +1,6 @@
 import std::sys;
 import std::traits(noreturn, honk);
+import a::b::c::d::d::e::e::e::e::e::e::e::q;
 
 alias x = y;
 
@@ -9,14 +10,17 @@ alias j = a::b::c;
 
 alias ptr = *void;
 
+alias str = *const<char, :cum = piss<shit, fart, **coom, [aaaa]>>;
+
 alias func = def(*********void, nuahjksgd, ashj, hjkasd::hjkasd) -> *void;
 alias ref = &aaa;
 
 alias arr = [void];
+
 alias asdasd = [void:10];
 
 alias str = *const<char>;
-alias arr = vec<char, alloc = GlobalAlloc<char>>;
+alias arr = vec<char, :alloc = GlobalAlloc<char>>;
 
 struct a {
     a: b;

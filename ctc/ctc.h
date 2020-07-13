@@ -134,76 +134,22 @@ typedef enum {
     /* a single identifier */
     AK_IDENT,
 
-    /* an array of asts */
-    AK_ARRAY,
+    /* a type is always an array of qualified types */
+    AK_TYPE,
 
-    /* types */
-
-    /* AK_QUAL_TYPES | AK_PTR | AK_REF | AK_ARR | AK_FUNC_TYPE */
-    /* AK_TYPE */
-
-    /* AK_IDENT ('<' AK_TYPE_ARGS '>')? */
     AK_QUAL,
-
-    /* '*' AK_TYPE */
-    AK_PTR,
-
-    /* '&' AK_TYPE */
     AK_REF,
-
-    /* '[' AK_TYPE (':' AK_EXPR)? ']' */
+    AK_PTR,
     AK_ARR,
-
-    /* 'def' AK_TYPES? ('->' AK_TYPE)? */
     AK_FUNC_TYPE,
 
-    /* AK_TYPE | ':' AK_IDENT '=' AK_TYPE */
-    AK_TYPE_ARG,
-
-    /* a flat array of types */
-    /* AK_TYPE_ARG (',' AK_TYPE_ARG)* */
-    AK_TYPE_ARGS,
-
-    /* AK_QUAL ('::' AK_QUAL)* */
-    AK_QUAL_TYPES,
+    AK_TYPE_PARAM,
 
     /* toplevel declarations */
-
-    /* AK_PATH AK_PATH? */
     AK_IMPORT,
-
     AK_ALIAS,
-    AK_FUNCTION,
-    AK_OBJECT,
-    AK_VARIABLE,
-    AK_STRUCT,
-    AK_UNION,
-    AK_ENUM,
 
-    /* AK_ARRAY<AK_IMPORT> AK_ARRAY<...> */
     AK_UNIT,
-
-    /* expressions and statements */
-
-    AK_LITERAL,
-    AK_PAREN,
-    AK_UNARY,
-    AK_BINARY,
-    AK_TERNARY,
-    AK_INIT,
-    AK_COERCE,
-    AK_CLOSURE,
-    AK_ACCESS,
-    AK_DEREF,
-    AK_CALL,
-    AK_SUBSCRIPT,
-
-    AK_FOR,
-    AK_RANGE,
-    AK_WHILE,
-    AK_RETURN,
-    AK_IF,
-    AK_STMTLIST
 } CtASTKind;
 
 typedef struct {
@@ -212,107 +158,74 @@ typedef struct {
     size_t len;
 } CtASTArray;
 
-typedef struct {
-    /* AK_IDENT */
-    struct CtAST* name;
-
-    /* AK_TYPE_ARGS? */
-    struct CtAST* params;
-} CtASTQualType;
 
 typedef struct {
-    /* AK_TYPE */
     struct CtAST* type;
-
-    /* AK_EXPR? */
     struct CtAST* size;
-} CtASTTypeArray;
+} CtASTArr;
 
 typedef struct {
-    /* AK_TYPES? */
-    struct CtAST* args;
-
-    /* AK_TYPE? */
+    CtASTArray args;
     struct CtAST* result;
 } CtASTFuncType;
 
 typedef struct {
-    /* AK_IDENT? */
     struct CtAST* name;
+    CtASTArray params;
+} CtASTQual;
 
-    /* AK_TYPE */
+typedef struct {
+    struct CtAST* name;
     struct CtAST* type;
-} CtASTTypeArg;
+} CtASTTypeParam;
 
-typedef struct {
-    /* AK_ARRAY<AK_IDENT> */
-    struct CtAST* path;
 
-    /* AK_ARRAY<AK_IDENT> */
-    struct CtAST* items;
-} CtASTImport;
 
 typedef struct {
     struct CtAST* name;
-    struct CtAST* params;
     struct CtAST* body;
 } CtASTAlias;
 
 typedef struct {
-    /* AK_ARRAY<AK_IMPORT> */
-    struct CtAST* imports;
+    CtASTArray path;
+    CtASTArray symbols;
+} CtASTImport;
 
-    /* AK_ARRAY<AK_ALIAS | AK_STRUCT | AK_UNION | AK_FUNCTION> */
-    struct CtAST* body;
+typedef struct {
+    CtASTArray imports;
+    CtASTArray symbols;
 } CtASTUnit;
 
 typedef union {
     /* AK_IDENT */
     char* ident;
 
-    /* AK_ARRAY */
-    CtASTArray array;
+    /* AK_TYPE */
+    CtASTArray types;
+
+    /* AK_TYPE_PARAM */
+    CtASTTypeParam param;
+
+    /* AK_FUNC_TYPE */
+    CtASTFuncType sig;
 
     /* AK_QUAL */
-    CtASTQualType qual_type;
+    CtASTQual qual;
 
-    /* AK_PTR */
-    struct CtAST* ptr;
+    /* AK_ARR */
+    CtASTArr arr;
 
     /* AK_REF */
     struct CtAST* ref;
 
-    /* AK_ARR */
-    CtASTTypeArray arr;
+    /* AK_PTR */
+    struct CtAST* ptr;
 
-    /* AK_FUNC_TYPE */
-    CtASTFuncType func_type;
-
-    /* AK_TYPE_ARG */
-    CtASTTypeArg type_arg;
-
-    /* AK_TYPE_ARGS */
-    CtASTArray type_args;
-
-    /* AK_QUAL_TYPES */
-    CtASTArray qual_types;
-
-    /* AK_IMPORT */
-    CtASTImport include;
-
+    /* AK_ALIAS */
     CtASTAlias alias;
 
-    CtASTFunction func;
-
-    CtASTObject object;
-
-    CtASTVariable var;
-
-    CtASTStruct struc;
-
-    CtASTUnion uni;
-
-    CtASTEnum enu;
+    /* AK_IMPORT, we name it include because import is a c++20 keyword */
+    CtASTImport include;
 
     /* AK_UNIT */
     CtASTUnit unit;
@@ -338,5 +251,7 @@ typedef struct {
 
 CtParser ctParseOpen(CtLexer* source);
 
+CtAST* ctParseUnit(CtParser* self);
+CtAST* ctParseInterp(CtParser* self);
 
 #endif /* CTC_H */
