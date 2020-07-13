@@ -148,6 +148,9 @@ typedef enum {
     /* expressions */
     AK_LITERAL,
     AK_UNARY,
+    AK_NAME,
+    AK_ACCESS,
+    AK_DEREF,
 
     /* toplevel declarations */
     AK_IMPORT,
@@ -183,7 +186,10 @@ typedef struct {
     struct CtAST* type;
 } CtASTTypeParam;
 
-
+typedef struct {
+    struct CtAST* expr;
+    struct CtAST* field;
+} CtASTAccess;
 
 typedef struct {
     struct CtAST* name;
@@ -206,6 +212,15 @@ typedef union {
 
     /* AK_UNARY */
     struct CtAST* expr;
+
+    /* AK_NAME */
+    struct CtAST* name;
+
+    /* AK_ACCESS */
+    CtASTAccess access;
+
+    /* AK_DEREF */
+    CtASTAccess deref;
 
     /* AK_TYPE */
     CtASTArray types;

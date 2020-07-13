@@ -1025,11 +1025,14 @@ static CtAST* parsePrimaryExpr(CtParser* self)
         {
         case K_LPAREN:
             /* (expr) */
+            node = parseExpr(self);
+            parseExpect(self, K_RPAREN);
+            break;
         case K_ADD: case K_MUL: case K_BITAND:
         case K_NOT: case K_BITNOT:
             node = makeAST(AK_UNARY);
             node->tok = tok;
-            node->data.expr = parsePrimaryExpr(self);
+            node->data.expr = parseExpr(self);
             break;
         default:
             /* error */
@@ -1044,7 +1047,8 @@ static CtAST* parsePrimaryExpr(CtParser* self)
     else if (tok.kind == TK_IDENT)
     {
         self->tok = tok;
-        CtAST* type = parseType(self);
+        node = makeAST(AK_NAME);
+        node->data.name = parseType(self);
     }
     else
     {
