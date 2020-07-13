@@ -4,7 +4,7 @@
 
 From highest to lowest. operators with the same precedence level are evaluated from left to right.
 
-1. Unary `~`, `!`, `*`, `&`
+1. Unary `~`, `!`, `*`, `&`, `-`, `+`
 2. Binary `*`, `/`, `%`
 3. Binary `+`, `-`
 4. Binary `<<`, `>>`

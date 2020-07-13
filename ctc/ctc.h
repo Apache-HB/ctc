@@ -145,6 +145,10 @@ typedef enum {
 
     AK_TYPE_PARAM,
 
+    /* expressions */
+    AK_LITERAL,
+    AK_UNARY,
+
     /* toplevel declarations */
     AK_IMPORT,
     AK_ALIAS,
@@ -199,6 +203,9 @@ typedef struct {
 typedef union {
     /* AK_IDENT */
     char* ident;
+
+    /* AK_UNARY */
+    struct CtAST* expr;
 
     /* AK_TYPE */
     CtASTArray types;

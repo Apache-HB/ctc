@@ -995,10 +995,74 @@ static CtAST* parseImport(CtParser* self)
     return node;
 }
 
+typedef enum {
+    OP_MUL,
+    OP_ADD,
+    OP_SHIFT,
+    OP_BITS,
+    OP_LOGIC,
+    OP_EQUAL,
+    OP_COMPARE,
+    OP_TERNARY,
+    OP_ASSIGN,
+
+    OP_ERROR
+} CtOpPrec;
+
+CtOpPrec binopPrec(CtKeyword key)
+{
+
+}
+
+static CtAST* parsePrimaryExpr(CtParser* self)
+{
+    CtToken tok = parseNext(self);
+    CtAST* node = NULL;
+
+    if (tok.kind == TK_KEYWORD)
+    {
+        switch (tok.data.key)
+        {
+        case K_LPAREN:
+            /* (expr) */
+        case K_ADD: case K_MUL: case K_BITAND:
+        case K_NOT: case K_BITNOT:
+            node = makeAST(AK_UNARY);
+            node->tok = tok;
+            node->data.expr = parsePrimaryExpr(self);
+            break;
+        default:
+            /* error */
+            break;
+        }
+    }
+    else if (tok.kind == TK_CHAR || tok.kind == TK_STRING || tok.kind == TK_INT)
+    {
+        node = makeAST(AK_LITERAL);
+        node->tok = tok;
+    }
+    else if (tok.kind == TK_IDENT)
+    {
+        self->tok = tok;
+        CtAST* type = parseType(self);
+    }
+    else
+    {
+        /* error */
+    }
+
+
+    return node;
+}
+
+static CtAST* parseBinaryExpr(CtParser* self, CtAST* lhs, CtOpPrec prec)
+{
+
+}
+
 static CtAST* parseExpr(CtParser* self)
 {
-    (void)self;
-    return NULL;
+    return parseBinaryExpr(self, parsePrimaryExpr(self), 0);
 }
 
 static CtAST* parseType(CtParser* self);
