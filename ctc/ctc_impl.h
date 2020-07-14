@@ -1454,7 +1454,6 @@ void ctLexEndTemplate(CtLexer* self)
     self->depth--;
 }
 
-
 void ctFreeToken(CtToken tok)
 {
     tokFree(tok);

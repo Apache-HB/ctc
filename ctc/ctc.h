@@ -19,13 +19,7 @@ typedef struct {
     int line;
     int col;
 
-    /**
-     * the length of the token.
-     * this may not be the true length for things like
-     * integers with suffixes or strings with prefixes
-     *
-     * use ctTokenLength to get the full length
-     */
+    /* the length of the token */
     int len;
 } CtStreamPos;
 
@@ -127,7 +121,6 @@ typedef struct {
 
 /* cleanup a token */
 void ctFreeToken(CtToken tok);
-int ctTokenLength(CtToken tok);
 
 CtStream ctStreamOpen(CtStreamCallbacks callbacks, void* data, const char* path);
 
