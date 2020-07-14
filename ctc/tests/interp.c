@@ -159,6 +159,7 @@ static CtDigit evalBin(CtAST* lhs, CtAST* rhs, CtKeyword op)
     DO_OP(K_SUB, -)
     DO_OP(K_MOD, %)
     DO_OP(K_DIV, /)
+    DO_OP(K_MUL, *)
     DO_OP(K_SHL, <<)
     DO_OP(K_SHR, >>)
     DO_OP(K_BITXOR, ^)
@@ -172,7 +173,25 @@ static CtDigit evalBin(CtAST* lhs, CtAST* rhs, CtKeyword op)
     DO_OP(K_LTE, <=)
     DO_OP(K_GT, >)
     DO_OP(K_GTE, >=)
-    default: return 0;
+    default: 
+        printf("oh no\n");
+        return 0;
+    }
+#undef DO_OP
+}
+
+static CtDigit evalUnary(CtAST* node)
+{
+#define DO_OP(key, exp) case key: return exp eval(node->data.expr);
+
+    switch (node->tok.data.key)
+    {
+    DO_OP(K_ADD, +)
+    DO_OP(K_SUB, -)
+    DO_OP(K_BITNOT, ~)
+    default:
+        printf("oh no\n");
+        return 0;
     }
 }
 
@@ -185,6 +204,15 @@ static CtDigit eval(CtAST* expr)
     else if (expr->kind == AK_BINOP)
     {
         return evalBin(expr->data.binop.lhs, expr->data.binop.rhs, expr->data.binop.op);
+    }
+    else if (expr->kind == AK_UNARY)
+    {
+        printf("%p\n", (void*)expr);
+        return evalUnary(expr);
+    }
+    else if (expr->kind == AK_TERNARY)
+    {
+        return eval(expr->data.ternary.cond) ? eval(expr->data.ternary.truthy) : eval(expr->data.ternary.falsey);
     }
     else
     {

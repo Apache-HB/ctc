@@ -833,8 +833,36 @@ static CtNumber lexDigit(CtLexer* self, int c)
  * parser internals
  */
 
+static char* astStr(CtAST* ast)
+{
+    char* out = NULL;
+
+    if (ast->kind == AK_LITERAL && ast->tok.kind == TK_INT)
+    {
+        CT_FMT_ARGS(out, "INT(%d)", ast->tok.data.digit.digit)
+    }
+    else if (ast->kind == AK_BINOP)
+    {
+        char* lhs = astStr(ast->data.binop.lhs);
+        char* rhs = astStr(ast->data.binop.rhs);
+        CT_FMT_ARGS(out, "BINOP(%s, %s, %s)", lhs, keyStr(ast->data.binop.op), rhs)
+        CT_FREE(lhs);
+        CT_FREE(rhs);
+    }
+    else if (ast->kind == AK_UNARY)
+    {
+        char* it = astStr(ast->data.expr);
+        CT_FMT_ARGS(out, "UNARY(%s, %s)", keyStr(ast->tok.data.key), it)
+        CT_FREE(it);
+    }
+
+    return out;
+}
+
 static CtASTArray makeArray(size_t size)
 {
+    (void)astStr;
+
     CtASTArray arr = { CT_MALLOC(sizeof(CtAST) * size), size, 0 };
 
     return arr;
@@ -1074,8 +1102,8 @@ static CtAST* parsePrimaryExpr(CtParser* self)
             node = parseExpr(self);
             parseExpect(self, K_RPAREN);
             break;
-        case K_ADD: case K_MUL: case K_BITAND:
-        case K_NOT: case K_BITNOT:
+        case K_ADD: case K_SUB: case K_MUL: 
+        case K_BITAND: case K_NOT: case K_BITNOT:
             node = makeAST(AK_UNARY);
             node->tok = parseNext(self);
             node->data.expr = parseExpr(self);
@@ -1095,11 +1123,9 @@ static CtAST* parsePrimaryExpr(CtParser* self)
         node = makeAST(AK_NAME);
         node->data.name = parseType(self);
     }
-    else
-    {
-        /* error */
-    }
-
+    
+    if (!node)
+        printf("oh no %s\n", tokStr(tok));
 
     return node;
 }
@@ -1117,6 +1143,29 @@ static CtAST* makeBinop(CtAST* lhs, CtAST* rhs, CtToken op)
 static CtAST* parseBinaryExpr(CtParser* self, CtAST* lhs, CtOpPrec min_prec)
 {
     CtToken ahead = parsePeek(self);
+
+    if (binopPrec(ahead) == OP_TERNARY)
+    {
+        parseNext(self);
+        
+        /* special case for ternarys */
+        CtAST* expr = makeAST(AK_TERNARY);
+        expr->data.ternary.cond = lhs;
+        
+        if (parseConsume(self, K_COLON))
+        {
+            expr->data.ternary.truthy = lhs;
+        }
+        else
+        {
+            expr->data.ternary.truthy = parsePrimaryExpr(self);
+            parseExpect(self, K_COLON);
+        }
+
+        expr->data.ternary.falsey = parseExpr(self);
+
+        return expr;
+    }
 
     while (binopPrec(ahead) >= min_prec)
     {
@@ -1280,9 +1329,6 @@ static CtAST* parseBody(CtParser* self)
     {
         node = parseAlias(self);
     }
-
-    if (!node)
-        printf(self->err);
 
     return node;
 }

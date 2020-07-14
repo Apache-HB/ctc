@@ -156,6 +156,7 @@ typedef enum {
     AK_NAME,
     AK_ACCESS,
     AK_DEREF,
+    AK_TERNARY,
 
     /* toplevel declarations */
     AK_IMPORT,
@@ -202,6 +203,12 @@ typedef struct {
 } CtASTAccess;
 
 typedef struct {
+    struct CtAST* cond;
+    struct CtAST* truthy;
+    struct CtAST* falsey;
+} CtASTTernary;
+
+typedef struct {
     struct CtAST* name;
     struct CtAST* body;
 } CtASTAlias;
@@ -234,6 +241,9 @@ typedef union {
 
     /* AK_BINOP */
     CtASTBinop binop;
+
+    /* AK_TERNARY */
+    CtASTTernary ternary;
 
     /* AK_TYPE */
     CtASTArray types;
