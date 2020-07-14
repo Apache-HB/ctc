@@ -710,7 +710,7 @@ static CtDigit lexBinDigit(CtLexer* self)
 static CtDigit lexDigit1(CtLexer* self, int c)
 {
     int i = 0;
-    CtDigit out = 0;
+    CtDigit out = (CtDigit)(c - '0');
 
     while (1)
     {
@@ -874,6 +874,19 @@ static CtToken parseNext(CtParser* self)
     return tok;
 }
 
+static CtToken parsePeek(CtParser* self)
+{
+    CtToken tok = self->tok;
+
+    if (tok.kind == TK_INVALID)
+    {
+        self->tok = ctLexNext(self->source);
+        tok = self->tok;
+    }
+
+    return tok;
+}
+
 static CtToken parseExpect(CtParser* self, CtKeyword key)
 {
     CtToken tok = parseNext(self);
@@ -996,27 +1009,59 @@ static CtAST* parseImport(CtParser* self)
 }
 
 typedef enum {
-    OP_MUL,
-    OP_ADD,
-    OP_SHIFT,
-    OP_BITS,
-    OP_LOGIC,
-    OP_EQUAL,
-    OP_COMPARE,
-    OP_TERNARY,
-    OP_ASSIGN,
+    OP_ERROR = 0,
 
-    OP_ERROR
+    OP_ASSIGN = 1,
+    OP_TERNARY = 2,
+    OP_COMPARE = 3,
+    OP_EQUAL = 4,
+    OP_LOGIC = 5,
+    OP_BITS = 6,
+    OP_SHIFT = 7,
+    OP_ADD = 8,
+    OP_MUL = 9,
 } CtOpPrec;
 
-CtOpPrec binopPrec(CtKeyword key)
+static CtOpPrec binopPrec(CtToken tok)
 {
+    if (tok.kind != TK_KEYWORD)
+        return OP_ERROR;
 
+    switch (tok.data.key)
+    {
+    case K_MUL: case K_DIV: case K_MOD:
+        return OP_MUL;
+    case K_ADD: case K_SUB:
+        return OP_ADD;
+    case K_SHL: case K_SHR:
+        return OP_SHIFT;
+    case K_BITXOR: case K_BITAND: case K_BITOR:
+        return OP_BITS;
+    case K_AND: case K_OR:
+        return OP_LOGIC;
+    case K_EQ: case K_NEQ:
+        return OP_EQUAL;
+    case K_LT: case K_LTE: case K_GT: case K_GTE:
+        return OP_COMPARE;
+    case K_QUESTION:
+        return OP_TERNARY;
+    case K_ASSIGN: case K_ADDEQ: case K_SUBEQ:
+    case K_MULEQ: case K_DIVEQ: case K_MODEQ:
+    case K_SHLEQ: case K_SHREQ: case K_BITXOREQ:
+    case K_BITANDEQ: case K_BITOREQ:
+        return OP_ASSIGN;
+
+    default:
+        return OP_ERROR;
+    }
 }
+
+static CtAST* parseExpr(CtParser* self);
+static CtAST* parseType(CtParser* self);
 
 static CtAST* parsePrimaryExpr(CtParser* self)
 {
-    CtToken tok = parseNext(self);
+    CtToken tok = parsePeek(self);
     CtAST* node = NULL;
 
     if (tok.kind == TK_KEYWORD)
@@ -1025,13 +1070,14 @@ static CtAST* parsePrimaryExpr(CtParser* self)
         {
         case K_LPAREN:
             /* (expr) */
+            parseNext(self);
             node = parseExpr(self);
             parseExpect(self, K_RPAREN);
             break;
         case K_ADD: case K_MUL: case K_BITAND:
         case K_NOT: case K_BITNOT:
             node = makeAST(AK_UNARY);
-            node->tok = tok;
+            node->tok = parseNext(self);
             node->data.expr = parseExpr(self);
             break;
         default:
@@ -1042,11 +1088,10 @@ static CtAST* parsePrimaryExpr(CtParser* self)
     else if (tok.kind == TK_CHAR || tok.kind == TK_STRING || tok.kind == TK_INT)
     {
         node = makeAST(AK_LITERAL);
-        node->tok = tok;
+        node->tok = parseNext(self);
     }
     else if (tok.kind == TK_IDENT)
     {
-        self->tok = tok;
         node = makeAST(AK_NAME);
         node->data.name = parseType(self);
     }
@@ -1059,14 +1104,41 @@ static CtAST* parsePrimaryExpr(CtParser* self)
     return node;
 }
 
-static CtAST* parseBinaryExpr(CtParser* self, CtAST* lhs, CtOpPrec prec)
+static CtAST* makeBinop(CtAST* lhs, CtAST* rhs, CtToken op)
 {
+    CtAST* node = makeAST(AK_BINOP);
+    node->tok = op;
+    node->data.binop.op = op.data.key;
+    node->data.binop.lhs = lhs;
+    node->data.binop.rhs = rhs;
+    return node;
+}
 
+static CtAST* parseBinaryExpr(CtParser* self, CtAST* lhs, CtOpPrec min_prec)
+{
+    CtToken ahead = parsePeek(self);
+
+    while (binopPrec(ahead) >= min_prec)
+    {
+        CtToken op = parseNext(self);
+        CtAST* rhs = parsePrimaryExpr(self);
+        ahead = parsePeek(self);
+
+        while (binopPrec(ahead) >= binopPrec(op) && binopPrec(ahead) != OP_ERROR)
+        {
+            rhs = parseBinaryExpr(self, rhs, binopPrec(ahead));
+            ahead = parsePeek(self);
+        }
+
+        lhs = makeBinop(lhs, rhs, op);
+    }
+
+    return lhs;
 }
 
 static CtAST* parseExpr(CtParser* self)
 {
-    return parseBinaryExpr(self, parsePrimaryExpr(self), 0);
+    return parseBinaryExpr(self, parsePrimaryExpr(self), OP_ASSIGN);
 }
 
 static CtAST* parseType(CtParser* self);
@@ -1168,7 +1240,7 @@ static CtAST* parseType(CtParser* self)
             break;
         case K_BITAND:
             node = makeAST(AK_REF);
-            node->data.ref = parseType(self);
+            node->data.ref = parseMany(self, parseQualType, K_COLON2);
             break;
         case K_LSQUARE:
             node = parseArray(self);
@@ -1340,6 +1412,8 @@ CtAST* ctParseUnit(CtParser* self)
 CtAST* ctParseInterp(CtParser* self)
 {
     CtAST* node = NULL;
+
+    TRY_PARSE(node, parseExpr(self))
 
     TRY_PARSE(node, parseImport(self))
     TRY_PARSE(node, parseBody(self))

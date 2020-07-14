@@ -2,6 +2,8 @@
 
 #include "ctc/ctc_impl.h"
 
+#include <signal.h>
+
 static int posixNext(void* stream) { return fgetc(stream); }
 
 static void printList(CtASTArray arr, void(*func)(CtAST*), const char* sep)
@@ -84,7 +86,7 @@ static void printType(CtAST* type)
     else if (type->kind == AK_REF)
     {
         printf("&");
-        printType(type->data.ref);
+        printList(type->data.types, printQualType, "::");
     }
     else if (type->kind == AK_FUNC_TYPE)
     {
@@ -146,6 +148,51 @@ static void printUnit(CtAST* unit)
     printList(unit->data.unit.symbols, printSymbol, NULL);
 }
 
+static CtDigit eval(CtAST* expr);
+
+static CtDigit evalBin(CtAST* lhs, CtAST* rhs, CtKeyword op)
+{
+#define DO_OP(op, expr) case op: return eval(lhs) expr eval(rhs);
+    switch (op)
+    {
+    DO_OP(K_ADD, +)
+    DO_OP(K_SUB, -)
+    DO_OP(K_MOD, %)
+    DO_OP(K_DIV, /)
+    DO_OP(K_SHL, <<)
+    DO_OP(K_SHR, >>)
+    DO_OP(K_BITXOR, ^)
+    DO_OP(K_BITAND, &)
+    DO_OP(K_BITOR, |)
+    DO_OP(K_AND, &&)
+    DO_OP(K_OR, ||)
+    DO_OP(K_EQ, ==)
+    DO_OP(K_NEQ, !=)
+    DO_OP(K_LT, <)
+    DO_OP(K_LTE, <=)
+    DO_OP(K_GT, >)
+    DO_OP(K_GTE, >=)
+    default: return 0;
+    }
+}
+
+static CtDigit eval(CtAST* expr)
+{
+    if (expr->kind == AK_LITERAL)
+    {
+        return expr->tok.data.digit.digit;
+    }
+    else if (expr->kind == AK_BINOP)
+    {
+        return evalBin(expr->data.binop.lhs, expr->data.binop.rhs, expr->data.binop.op);
+    }
+    else
+    {
+        printf("oh no\n");
+        return 0;
+    }
+}
+
 int main(int argc, const char** argv)
 {
     (void)argc;
@@ -160,6 +207,10 @@ int main(int argc, const char** argv)
     stream = ctStreamOpen(callbacks, fopen(argv[1], "rt"), "stdin");
     lex = ctLexOpen(&stream);
     parse = ctParseOpen(&lex);
+
+    CtAST* node = ctParseInterp(&parse);
+
+    printf("eval %d\n", eval(node));
 
     CtAST* unit = ctParseUnit(&parse);
 

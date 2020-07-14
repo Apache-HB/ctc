@@ -1,9 +1,9 @@
-project('ctc', 'c')
+project('ctc', ['c', 'cpp'])
 
 sources = [
     'ctc/tests/interp.c'
 ]
 
-ctc = executable('ctc', sources,
+cti = executable('cti', sources,
     include_directories : include_directories('.')
 )

@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     /* filename */
     const char* name;
@@ -148,6 +152,7 @@ typedef enum {
     /* expressions */
     AK_LITERAL,
     AK_UNARY,
+    AK_BINOP,
     AK_NAME,
     AK_ACCESS,
     AK_DEREF,
@@ -165,6 +170,11 @@ typedef struct {
     size_t len;
 } CtASTArray;
 
+typedef struct {
+    CtKeyword op;
+    struct CtAST* lhs;
+    struct CtAST* rhs;
+} CtASTBinop;
 
 typedef struct {
     struct CtAST* type;
@@ -222,6 +232,9 @@ typedef union {
     /* AK_DEREF */
     CtASTAccess deref;
 
+    /* AK_BINOP */
+    CtASTBinop binop;
+
     /* AK_TYPE */
     CtASTArray types;
 
@@ -238,7 +251,7 @@ typedef union {
     CtASTArr arr;
 
     /* AK_REF */
-    struct CtAST* ref;
+    CtASTArray ref;
 
     /* AK_PTR */
     struct CtAST* ptr;
@@ -275,5 +288,9 @@ CtParser ctParseOpen(CtLexer* source);
 
 CtAST* ctParseUnit(CtParser* self);
 CtAST* ctParseInterp(CtParser* self);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CTC_H */

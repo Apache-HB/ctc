@@ -73,7 +73,7 @@ qualType : Ident typeArgs? ;
 qualTypes : qualType ('::' qualType)* ;
 
 arrType : '[' type (':' expr)? ']' ;
-ptrType : '*' type ;
+ptrType : '*' qualTypes ;
 refType : '&' type ;
 
 typeList : type (',' type)* ;
