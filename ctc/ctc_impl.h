@@ -234,11 +234,20 @@ static int streamPeek(CtStream* self)
     return self->ahead;
 }
 
-static int streamConsume(CtStream* self, int c)
+/**
+ * wrap streamNext so we can track length easily
+ */
+static int lexGet(CtLexer* self)
 {
-    if (streamPeek(self) == c)
+    self->len++;
+    return streamNext(self->stream);
+}
+
+static int lexConsume(CtLexer* self, int c)
+{
+    if (streamPeek(self->stream) == c)
     {
-        streamNext(self);
+        lexGet(self);
         return 1;
     }
 
@@ -248,23 +257,23 @@ static int streamConsume(CtStream* self, int c)
 /* skip whitespace and comments */
 static int lexSkip(CtLexer* self)
 {
-    int c = streamNext(self->stream);
+    int c = lexGet(self);
 
     while (1)
     {
         /* skip whitespace */
         if (isspace(c))
         {
-            c = streamNext(self->stream);
+            c = lexGet(self);
         }
         else if (c == '#')
         {
-            c = streamNext(self->stream);
+            c = lexGet(self);
 
             /* skip until newline */
             while (c != '\n')
             {
-                c = streamNext(self->stream);
+                c = lexGet(self);
             }
         }
         else
@@ -299,7 +308,7 @@ enum {
 
 static void lexEscapeChar(CtLexer* self, char* out)
 {
-    int c = streamNext(self->stream);
+    int c = lexGet(self);
 
     switch (c)
     {
@@ -319,7 +328,7 @@ static void lexEscapeChar(CtLexer* self, char* out)
 
 static int lexSingleChar(CtLexer* self, char* out)
 {
-    int c = streamNext(self->stream);
+    int c = lexGet(self);
 
     if (c == '\n')
     {
@@ -386,9 +395,9 @@ static void lexMultiString(CtLexer* self, CtBuffer* buf)
         if (res == STR_END)
         {
             /* check if the string is actually terminated */
-            if (streamConsume(self->stream, '"'))
+            if (lexConsume(self, '"'))
             {
-                if (streamConsume(self->stream, '"'))
+                if (lexConsume(self, '"'))
                 {
                     /* it is actually terminated */
                     break;
@@ -425,9 +434,9 @@ static CtString lexString(CtLexer* self)
     CtString out;
     CtBuffer buf;
 
-    if (streamConsume(self->stream, '"'))
+    if (lexConsume(self, '"'))
     {
-        if (streamConsume(self->stream, '"'))
+        if (lexConsume(self, '"'))
         {
             /* is a multiline string */
             buf = bufNew(128);
@@ -477,7 +486,7 @@ static void lexIdent(CtLexer* self, CtToken* out, int c)
         bufPush(&buf, (char)c);
 
     while (isident2(streamPeek(self->stream)))
-        bufPush(&buf, (char)streamNext(self->stream));
+        bufPush(&buf, (char)lexGet(self));
 
     /* check if its a keyword */
     for (i = 0; i < KEY_TABLE_SIZE; i++)
@@ -490,7 +499,7 @@ static void lexIdent(CtLexer* self, CtToken* out, int c)
         }
     }
 
-    if (streamConsume(self->stream, '"'))
+    if (lexConsume(self, '"'))
     {
         /**
          * if the next charater is the start of a string then
@@ -516,50 +525,50 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
     {
         /* math operators */
     case '+':
-        out->data.key = streamConsume(self->stream, '=') ? K_ADDEQ : K_ADD;
+        out->data.key = lexConsume(self, '=') ? K_ADDEQ : K_ADD;
         break;
     case '-':
-        if (streamConsume(self->stream, '>'))
+        if (lexConsume(self, '>'))
             out->data.key = K_ARROW;
         else
-            out->data.key = streamConsume(self->stream, '=') ? K_SUBEQ : K_SUB;
+            out->data.key = lexConsume(self, '=') ? K_SUBEQ : K_SUB;
         break;
     case '*':
-        out->data.key = streamConsume(self->stream, '=') ? K_MULEQ : K_MUL;
+        out->data.key = lexConsume(self, '=') ? K_MULEQ : K_MUL;
         break;
     case '/':
-        out->data.key = streamConsume(self->stream, '=') ? K_DIVEQ : K_DIV;
+        out->data.key = lexConsume(self, '=') ? K_DIVEQ : K_DIV;
         break;
     case '%':
-        out->data.key = streamConsume(self->stream, '=') ? K_MODEQ : K_MOD;
+        out->data.key = lexConsume(self, '=') ? K_MODEQ : K_MOD;
         break;
 
         /* bitwise and logical operators */
     case '^':
-        out->data.key = streamConsume(self->stream, '=') ? K_BITXOREQ : K_BITXOR;
+        out->data.key = lexConsume(self, '=') ? K_BITXOREQ : K_BITXOR;
         break;
     case '&':
-        if (streamConsume(self->stream, '&'))
+        if (lexConsume(self, '&'))
             out->data.key = K_AND;
-        else if (streamConsume(self->stream, '='))
+        else if (lexConsume(self, '='))
             out->data.key = K_BITANDEQ;
         else
             out->data.key = K_BITAND;
         break;
     case '|':
-        if (streamConsume(self->stream, '|'))
+        if (lexConsume(self, '|'))
             out->data.key = K_OR;
-        else if (streamConsume(self->stream, '='))
+        else if (lexConsume(self, '='))
             out->data.key = K_BITOREQ;
         else
             out->data.key = K_BITOR;
         break;
     case '<':
-        if (streamConsume(self->stream, '<'))
-            out->data.key = streamConsume(self->stream, '=') ? K_SHLEQ : K_SHL;
-        else if (streamConsume(self->stream, '='))
+        if (lexConsume(self, '<'))
+            out->data.key = lexConsume(self, '=') ? K_SHLEQ : K_SHL;
+        else if (lexConsume(self, '='))
             out->data.key = K_LTE;
-        else if (streamConsume(self->stream, '|')) /* the <| operator for streams */
+        else if (lexConsume(self, '|')) /* the <| operator for streams */
             out->data.key = K_STREAM;
         else
             out->data.key = K_LT;
@@ -575,9 +584,9 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
          * NOTE: the self->depth == 0 check has to be first due to
          * short circuiting rules
          */
-        if (self->depth == 0 && streamConsume(self->stream, '>'))
-            out->data.key = streamConsume(self->stream, '=') ? K_SHREQ : K_SHR;
-        else if (streamConsume(self->stream, '='))
+        if (self->depth == 0 && lexConsume(self, '>'))
+            out->data.key = lexConsume(self, '=') ? K_SHREQ : K_SHR;
+        else if (lexConsume(self, '='))
             out->data.key = K_GTE;
         else
             out->data.key = K_GT;
@@ -588,10 +597,10 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
 
         /* logical operators */
     case '!':
-        out->data.key = streamConsume(self->stream, '=') ? K_NEQ : K_NOT;
+        out->data.key = lexConsume(self, '=') ? K_NEQ : K_NOT;
         break;
     case '=':
-        out->data.key = streamConsume(self->stream, '=') ? K_EQ : K_ASSIGN;
+        out->data.key = lexConsume(self, '=') ? K_EQ : K_ASSIGN;
         break;
 
         /* syntax operators */
@@ -608,7 +617,7 @@ static void lexSymbol(CtLexer* self, int c, CtToken* out)
         out->data.key = K_QUESTION;
         break;
     case ':':
-        out->data.key = streamConsume(self->stream, ':') ? K_COLON2 : K_COLON;
+        out->data.key = lexConsume(self, ':') ? K_COLON2 : K_COLON;
         break;
     case ';':
         out->data.key = K_SEMI;
@@ -643,7 +652,7 @@ static CtDigit lexHexDigit(CtLexer* self)
     int i = 0;
     int c;
     CtDigit out = 0;
-    streamNext(self->stream);
+    lexGet(self);
 
     while (1)
     {
@@ -666,7 +675,7 @@ static CtDigit lexHexDigit(CtLexer* self)
             break;
         }
 
-        streamNext(self->stream);
+        lexGet(self);
     }
 
     return out;
@@ -678,7 +687,7 @@ static CtDigit lexBinDigit(CtLexer* self)
     int i = 0;
     int c;
     CtDigit out = 0;
-    streamNext(self->stream);
+    lexGet(self);
 
     while (1)
     {
@@ -689,7 +698,7 @@ static CtDigit lexBinDigit(CtLexer* self)
             if (c == '1')
                 out += 1;
 
-            streamNext(self->stream);
+            lexGet(self);
 
             if (i++ > 64)
             {
@@ -718,7 +727,7 @@ static CtDigit lexDigit1(CtLexer* self, int c)
         if (isdigit(c))
         {
             out *= (10 + ((uint8_t)c - '0'));
-            streamNext(self->stream);
+            lexGet(self);
 
             if (i++ > 22)
             {
@@ -755,7 +764,7 @@ static CtDigit lexDigit0(CtLexer* self, CtNumberEncoding* enc)
     {
         /* base 10 */
         *enc = NE_INT;
-        return lexDigit1(self, streamNext(self->stream));
+        return lexDigit1(self, lexGet(self));
     }
     else
     {
@@ -780,7 +789,7 @@ static CtChar lexChar(CtLexer* self)
         return c;
     }
 
-    int64_t res2 = streamNext(self->stream);
+    int64_t res2 = lexGet(self);
 
     if (res != '\'')
         CT_FMT_ARGS(self->err, "expected ' after character literal but got `%s` instead", charStr((CtChar*)&res2))
@@ -1102,7 +1111,7 @@ static CtAST* parsePrimaryExpr(CtParser* self)
             node = parseExpr(self);
             parseExpect(self, K_RPAREN);
             break;
-        case K_ADD: case K_SUB: case K_MUL: 
+        case K_ADD: case K_SUB: case K_MUL:
         case K_BITAND: case K_NOT: case K_BITNOT:
             node = makeAST(AK_UNARY);
             node->tok = parseNext(self);
@@ -1123,7 +1132,7 @@ static CtAST* parsePrimaryExpr(CtParser* self)
         node = makeAST(AK_NAME);
         node->data.name = parseType(self);
     }
-    
+
     if (!node)
         printf("oh no %s\n", tokStr(tok));
 
@@ -1147,11 +1156,11 @@ static CtAST* parseBinaryExpr(CtParser* self, CtAST* lhs, CtOpPrec min_prec)
     if (binopPrec(ahead) == OP_TERNARY)
     {
         parseNext(self);
-        
+
         /* special case for ternarys */
         CtAST* expr = makeAST(AK_TERNARY);
         expr->data.ternary.cond = lhs;
-        
+
         if (parseConsume(self, K_COLON))
         {
             expr->data.ternary.truthy = lhs;
@@ -1215,7 +1224,7 @@ static CtAST* parseArray(CtParser* self)
     return node;
 }
 
-#define IN_TEMPLATE(self, ...) { self->source->depth++; __VA_ARGS__ self->source->depth--; }
+#define IN_TEMPLATE(self, ...) { ctLexBeginTemplate(self->source); __VA_ARGS__ ctLexEndTemplate(self->source); }
 
 static CtAST* parseQualTypeParam(CtParser* self)
 {
@@ -1383,6 +1392,9 @@ CtToken ctLexNext(CtLexer* self)
     int c = lexSkip(self);
     CtToken tok;
 
+    /* reset the length of the current token */
+    self->len = 0;
+
     /* save the position */
     tok.pos = self->stream->pos;
 
@@ -1419,6 +1431,9 @@ CtToken ctLexNext(CtLexer* self)
         lexSymbol(self, c, &tok);
     }
 
+    /* save the length for error reporting if needed */
+    tok.pos.len = self->len;
+
     if (self->err)
     {
         tok.kind = TK_ERROR;
@@ -1428,6 +1443,17 @@ CtToken ctLexNext(CtLexer* self)
 
     return tok;
 }
+
+void ctLexBeginTemplate(CtLexer* self)
+{
+    self->depth++;
+}
+
+void ctLexEndTemplate(CtLexer* self)
+{
+    self->depth--;
+}
+
 
 void ctFreeToken(CtToken tok)
 {

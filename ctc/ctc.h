@@ -18,6 +18,15 @@ typedef struct {
     int pos;
     int line;
     int col;
+
+    /**
+     * the length of the token.
+     * this may not be the true length for things like
+     * integers with suffixes or strings with prefixes
+     *
+     * use ctTokenLength to get the full length
+     */
+    int len;
 } CtStreamPos;
 
 typedef struct {
@@ -118,12 +127,16 @@ typedef struct {
 
 /* cleanup a token */
 void ctFreeToken(CtToken tok);
+int ctTokenLength(CtToken tok);
 
 CtStream ctStreamOpen(CtStreamCallbacks callbacks, void* data, const char* path);
 
 typedef struct {
     CtStream* stream;
     char* err;
+
+    /* used for tracking the length of the current token */
+    int len;
 
     int depth;
 } CtLexer;
@@ -133,6 +146,10 @@ CtLexer ctLexOpen(CtStream* stream);
 
 /* get a single token from the stream */
 CtToken ctLexNext(CtLexer* self);
+
+/* use these for handling context sensitive lexing in templates */
+void ctLexBeginTemplate(CtLexer* self);
+void ctLexEndTemplate(CtLexer* self);
 
 typedef enum {
     /* a single identifier */
