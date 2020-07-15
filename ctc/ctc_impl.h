@@ -1254,7 +1254,7 @@ static CtAST* parsePrimaryExpr(CtParser* self)
     else if (tok.kind == TK_IDENT)
     {
         node = makeAST(AK_NAME);
-        node->data.name = parseType(self);
+        node->data.names = parseMany(self, parseIdent, K_COLON2);
     }
 
     while (1)
@@ -1781,10 +1781,22 @@ static CtAST* parseStmt(CtParser* self)
     {
         node = parseDoWhileStmt(self);
     }
+    else if (parseConsume(self, K_ALIAS))
+    {
+        node = parseAlias(self);
+    }
+    else if (parseConsume(self, K_VAR))
+    {
+        node = parseVar(self);
+    }
     else
     {
         node = parseExpr(self);
+        parseExpect(self, K_SEMI);
     }
+
+    if (!node)
+        printf("oh no\n");
 
     return node;
 }

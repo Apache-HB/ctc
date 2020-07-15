@@ -224,6 +224,7 @@ static CtDigit eval(CtAST* expr)
 int main(int argc, const char** argv)
 {
     (void)argc;
+    (void)argv;
 
     CtStreamCallbacks callbacks;
     CtStream stream;
@@ -232,13 +233,13 @@ int main(int argc, const char** argv)
 
     callbacks.next = posixNext;
 
-    stream = ctStreamOpen(callbacks, fopen(argv[1], "rt"), "stdin");
+    stream = ctStreamOpen(callbacks, stdin, "stdin");
     lex = ctLexOpen(&stream);
     parse = ctParseOpen(&lex);
 
-    CtAST* node = ctParseInterp(&parse);
+    //CtAST* node = ctParseInterp(&parse);
 
-    printf("eval %d\n", eval(node));
+    //printf("eval %d\n", eval(node));
 
     CtAST* unit = ctParseUnit(&parse);
 

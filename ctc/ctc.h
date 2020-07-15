@@ -363,7 +363,7 @@ typedef union {
     struct CtAST* expr;
 
     /* AK_NAME */
-    struct CtAST* name;
+    CtASTArray names;
 
     /* AK_ACCESS */
     CtASTAccess access;

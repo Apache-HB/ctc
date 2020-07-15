@@ -18,3 +18,7 @@ test: setup
 
 interp: setup
 	$(CC) ctc/tests/interp.c -o build/interp $(CFLAGS)
+
+validate: setup
+	$(CC) ctc/tests/validate.c -o build/validate $(CFLAGS)
+	
