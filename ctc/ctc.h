@@ -167,10 +167,36 @@ typedef enum {
     AK_ACCESS,
     AK_DEREF,
     AK_TERNARY,
+    AK_COERCE,
+    AK_INIT,
+    AK_CALL,
+    AK_INIT_ARG,
+    AK_CALL_ARG,
+    AK_SUBSCRIPT,
 
     /* toplevel declarations */
     AK_IMPORT,
     AK_ALIAS,
+    AK_STRUCT,
+    AK_UNION,
+    AK_ENUM,
+    AK_VAR,
+    AK_FUNCTION,
+
+    AK_FIELD,
+    AK_ENUM_FIELD,
+    AK_VAR_NAME,
+    AK_FUNC_ARG,
+
+    AK_STMT_LIST,
+    AK_RETURN,
+
+    /* if, else if, else */
+    AK_BRANCH,
+    AK_BRANCH_LEAF,
+    AK_WHILE,
+    AK_FOR,
+    AK_DO_WHILE,
 
     AK_UNIT,
 } CtASTKind;
@@ -219,9 +245,105 @@ typedef struct {
 } CtASTTernary;
 
 typedef struct {
+    struct CtAST* type;
+    struct CtAST* expr;
+} CtASTCast;
+
+typedef struct {
     struct CtAST* name;
     struct CtAST* body;
 } CtASTAlias;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+} CtASTField;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTArray fields;
+} CtASTStruct;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTArray fields;
+} CtASTUnion;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* backing;
+    CtASTArray fields;
+} CtASTEnum;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTArray fields;
+    struct CtAST* val;
+} CtASTEnumField;
+
+typedef struct {
+    CtASTArray names;
+    struct CtAST* init;
+} CtASTVar;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+} CtASTVarName;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* type;
+    struct CtAST* init;
+} CtASTFuncArg;
+
+typedef struct {
+    struct CtAST* name;
+    CtASTArray args;
+    struct CtAST* result;
+    struct CtAST* body;
+} CtASTFunction;
+
+typedef struct {
+    struct CtAST* cond;
+    struct CtAST* body;
+} CtASTBranchLeaf;
+
+typedef struct {
+    CtASTArray names;
+    struct CtAST* range;
+    struct CtAST* body;
+} CtASTForStmt;
+
+typedef struct {
+    struct CtAST* cond;
+    struct CtAST* body;
+} CtASTWhileStmt;
+
+typedef struct {
+    struct CtAST* func;
+    CtASTArray args;
+} CtASTCall;
+
+typedef struct {
+    struct CtAST* name;
+    struct CtAST* val;
+} CtASTCallArg;
+
+typedef struct {
+    struct CtAST* type;
+    CtASTArray args;
+} CtASTInit;
+
+typedef struct {
+    struct CtAST* field;
+    struct CtAST* val;
+} CtASTInitArg;
+
+typedef struct {
+    struct CtAST* expr;
+    struct CtAST* idx;
+} CtASTSubscript;
 
 typedef struct {
     CtASTArray path;
@@ -237,7 +359,7 @@ typedef union {
     /* AK_IDENT */
     char* ident;
 
-    /* AK_UNARY */
+    /* AK_UNARY, AK_RETURN */
     struct CtAST* expr;
 
     /* AK_NAME */
@@ -254,6 +376,9 @@ typedef union {
 
     /* AK_TERNARY */
     CtASTTernary ternary;
+
+    /* AK_COERCE */
+    CtASTCast cast;
 
     /* AK_TYPE */
     CtASTArray types;
@@ -278,6 +403,63 @@ typedef union {
 
     /* AK_ALIAS */
     CtASTAlias alias;
+
+    /* AK_STRUCT */
+    CtASTStruct struc;
+
+    /* AK_UNION */
+    CtASTUnion uni;
+
+    /* AK_ENUM */
+    CtASTEnum enu;
+
+    /* AK_ENUM_FIELD */
+    CtASTEnumField efield;
+
+    /* AK_FIELD */
+    CtASTField field;
+
+    /* AK_VAR */
+    CtASTVar var;
+
+    /* AK_VAR_NAME */
+    CtASTVarName vname;
+
+    /* AK_FUNCTION */
+    CtASTFunction func;
+
+    /* AK_FUNC_ARG */
+    CtASTFuncArg arg;
+
+    /* AK_STMT_LIST */
+    CtASTArray stmts;
+
+    /* AK_BRANCH */
+    CtASTArray branches;
+
+    /* AK_BRANCH_LEAF */
+    CtASTBranchLeaf leaf;
+
+    /* AK_FOR */
+    CtASTForStmt loop;
+
+    /* AK_WHILE, AK_DO_WHILE */
+    CtASTWhileStmt wloop;
+
+    /* AK_CALL */
+    CtASTCall call;
+
+    /* AK_CALL_ARG */
+    CtASTCallArg carg;
+
+    /* AK_INIT */
+    CtASTInit init;
+
+    /* AK_INIT_ARG */
+    CtASTInitArg iarg;
+
+    /* AK_SUBSCRIPT */
+    CtASTSubscript subscript;
 
     /* AK_IMPORT, we name it include because import is a c++20 keyword */
     CtASTImport include;

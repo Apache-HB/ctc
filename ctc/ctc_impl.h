@@ -842,6 +842,8 @@ static CtNumber lexDigit(CtLexer* self, int c)
  * parser internals
  */
 
+#define IN_TEMPLATE(self, ...) { ctLexBeginTemplate(self->source); __VA_ARGS__ ctLexEndTemplate(self->source); }
+
 static char* astStr(CtAST* ast)
 {
     char* out = NULL;
@@ -1008,6 +1010,18 @@ static CtASTArray parseUntil(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword
     return arr;
 }
 
+static CtASTArray parseUntilEnd(CtParser* self, CtAST*(*func)(CtParser*), CtKeyword end)
+{
+    CtASTArray arr = makeArray(0);
+
+    while (!parseConsume(self, end))
+    {
+        arrayAdd(&arr, func(self));
+    }
+
+    return arr;
+}
+
 static CtASTArray parseImportSymbols(CtParser* self)
 {
     CtASTArray symbols;
@@ -1096,6 +1110,106 @@ static CtOpPrec binopPrec(CtToken tok)
 static CtAST* parseExpr(CtParser* self);
 static CtAST* parseType(CtParser* self);
 
+static CtAST* parseCoerce(CtParser* self)
+{
+    CtAST* node = makeAST(AK_COERCE);
+    IN_TEMPLATE(self, {
+        parseExpect(self, K_LT);
+        node->data.cast.type = parseType(self);
+        parseExpect(self, K_GT);
+    })
+
+    parseExpect(self, K_LPAREN);
+    node->data.cast.expr = parseExpr(self);
+    parseExpect(self, K_RPAREN);
+
+    return node;
+}
+
+static CtAST* parseCallArg(CtParser* self)
+{
+    CtAST* arg = makeAST(AK_CALL_ARG);
+
+    if (parseConsume(self, K_LSQUARE))
+    {
+        arg->data.carg.name = parseIdent(self);
+        parseExpect(self, K_RSQUARE);
+        parseExpect(self, K_ASSIGN);
+    }
+    else
+    {
+        arg->data.carg.name = NULL;
+    }
+
+    arg->data.carg.val = parseExpr(self);
+
+    return arg;
+}
+
+static CtAST* parseCall(CtParser* self, CtAST* lhs)
+{
+    CtAST* call = makeAST(AK_CALL);
+    call->data.call.func = lhs;
+    call->data.call.args = parseUntil(self, parseCallArg, K_COMMA, K_RPAREN);
+
+    return call;
+}
+
+static CtAST* parseInitArg(CtParser* self)
+{
+    CtAST* arg = makeAST(AK_INIT_ARG);
+
+    if (parseConsume(self, K_LSQUARE))
+    {
+        arg->data.iarg.field = parseExpr(self);
+        parseExpect(self, K_RSQUARE);
+        parseExpect(self, K_ASSIGN);
+    }
+    else
+    {
+        arg->data.iarg.field = NULL;
+    }
+
+    arg->data.iarg.val = parseExpr(self);
+
+    return arg;
+}
+
+static CtAST* parseInit(CtParser* self, CtAST* lhs)
+{
+    CtAST* init = makeAST(AK_INIT);
+    init->data.init.type = lhs;
+    init->data.init.args = parseUntil(self, parseInitArg, K_COMMA, K_RBRACE);
+
+    return init;
+}
+
+static CtAST* parseSubscript(CtParser* self, CtAST* lhs)
+{
+    CtAST* sub = makeAST(AK_SUBSCRIPT);
+    sub->data.subscript.expr = lhs;
+    sub->data.subscript.idx = parseExpr(self);
+    parseExpect(self, K_RSQUARE);
+
+    return sub;
+}
+
+static CtAST* parseAccess(CtParser* self, CtAST* lhs)
+{
+    CtAST* node = makeAST(AK_ACCESS);
+    node->data.access.expr = lhs;
+    node->data.access.field = parseIdent(self);
+    return node;
+}
+
+static CtAST* parseDeref(CtParser* self, CtAST* lhs)
+{
+    CtAST* node = makeAST(AK_DEREF);
+    node->data.deref.expr = lhs;
+    node->data.deref.field = parseIdent(self);
+    return node;
+}
+
 static CtAST* parsePrimaryExpr(CtParser* self)
 {
     CtToken tok = parsePeek(self);
@@ -1117,6 +1231,16 @@ static CtAST* parsePrimaryExpr(CtParser* self)
             node->tok = parseNext(self);
             node->data.expr = parseExpr(self);
             break;
+        case K_COERCE:
+            parseNext(self);
+            node = parseCoerce(self);
+            break;
+        case K_LBRACE:
+            parseNext(self);
+            node = makeAST(AK_INIT);
+            node->data.init.type = NULL;
+            node->data.init.args = parseUntil(self, parseInitArg, K_COMMA, K_RBRACE);
+            break;
         default:
             /* error */
             break;
@@ -1131,6 +1255,34 @@ static CtAST* parsePrimaryExpr(CtParser* self)
     {
         node = makeAST(AK_NAME);
         node->data.name = parseType(self);
+    }
+
+    while (1)
+    {
+        if (parseConsume(self, K_LPAREN))
+        {
+            node = parseCall(self, node);
+        }
+        else if (parseConsume(self, K_LBRACE))
+        {
+            node = parseInit(self, node);
+        }
+        else if (parseConsume(self, K_LSQUARE))
+        {
+            node = parseSubscript(self, node);
+        }
+        else if (parseConsume(self, K_DOT))
+        {
+            node = parseAccess(self, node);
+        }
+        else if (parseConsume(self, K_ARROW))
+        {
+            node = parseDeref(self, node);
+        }
+        else
+        {
+            break;
+        }
     }
 
     if (!node)
@@ -1223,8 +1375,6 @@ static CtAST* parseArray(CtParser* self)
     parseExpect(self, K_RSQUARE);
     return node;
 }
-
-#define IN_TEMPLATE(self, ...) { ctLexBeginTemplate(self->source); __VA_ARGS__ ctLexEndTemplate(self->source); }
 
 static CtAST* parseQualTypeParam(CtParser* self)
 {
@@ -1328,6 +1478,158 @@ static CtAST* parseAlias(CtParser* self)
     return node;
 }
 
+static CtAST* parseField(CtParser* self)
+{
+    CtAST* field = makeAST(AK_FIELD);
+
+    field->data.field.name = parseIdent(self);
+    parseExpect(self, K_COLON);
+    field->data.field.type = parseType(self);
+    parseExpect(self, K_SEMI);
+
+    return field;
+}
+
+static CtAST* parseStruct(CtParser* self)
+{
+    CtAST* struc = makeAST(AK_STRUCT);
+    struc->data.struc.name = parseIdent(self);
+
+    parseExpect(self, K_LBRACE);
+    struc->data.struc.fields = parseUntilEnd(self, parseField, K_RBRACE);
+
+    return struc;
+}
+
+static CtAST* parseUnion(CtParser* self)
+{
+    CtAST* uni = makeAST(AK_UNION);
+    uni->data.uni.name = parseIdent(self);
+
+    parseExpect(self, K_LBRACE);
+    uni->data.uni.fields = parseUntilEnd(self, parseField, K_RBRACE);
+
+    return uni;
+}
+
+static CtAST* parseEnumField(CtParser* self)
+{
+    CtAST* field = makeAST(AK_ENUM_FIELD);
+    field->data.efield.name = parseIdent(self);
+    field->data.efield.fields = parseConsume(self, K_LBRACE) ? parseUntilEnd(self, parseField, K_RBRACE) : makeArray(0);
+    field->data.efield.val = parseConsume(self, K_ASSIGN) ? parseExpr(self) : NULL;
+
+    return field;
+}
+
+static CtAST* parseEnum(CtParser* self)
+{
+    CtAST* enu = makeAST(AK_ENUM);
+    enu->data.enu.name = parseIdent(self);
+    enu->data.enu.backing = parseConsume(self, K_COLON) ? parseType(self) : NULL;
+
+    parseExpect(self, K_LBRACE);
+    enu->data.enu.fields = parseUntil(self, parseEnumField, K_COMMA, K_RBRACE);
+
+    return enu;
+}
+
+static CtAST* parseVarName(CtParser* self)
+{
+    CtAST* name = makeAST(AK_VAR_NAME);
+    name->data.vname.name = parseIdent(self);
+    name->data.vname.type = parseConsume(self, K_COLON) ? parseType(self) : NULL;
+
+    return name;
+}
+
+static CtASTArray parseVarNames(CtParser* self)
+{
+    CtASTArray names;
+    if (parseConsume(self, K_LSQUARE))
+    {
+        names = parseUntil(self, parseVarName, K_COMMA, K_RSQUARE);
+    }
+    else
+    {
+        names = makeArray(1);
+        arrayAdd(&names, parseVarName(self));
+    }
+
+    return names;
+}
+
+static CtAST* parseVar(CtParser* self)
+{
+    CtAST* node = makeAST(AK_VAR);
+    node->data.var.names = parseVarNames(self);
+    node->data.var.init = parseConsume(self, K_ASSIGN) ? parseExpr(self) : NULL;
+
+    parseExpect(self, K_SEMI);
+
+    return node;
+}
+
+static CtAST* parseStmt(CtParser* self);
+
+static CtAST* parseStmtList(CtParser* self)
+{
+    CtAST* list = makeAST(AK_STMT_LIST);
+    list->data.stmts = parseUntilEnd(self, parseStmt, K_RBRACE);
+    return list;
+}
+
+static CtAST* parseFuncArg(CtParser* self)
+{
+    CtAST* arg = makeAST(AK_FUNC_ARG);
+    arg->data.arg.name = parseIdent(self);
+    parseExpect(self, K_COLON);
+    arg->data.arg.type = parseType(self);
+    arg->data.arg.init = parseConsume(self, K_ASSIGN) ? parseExpr(self) : NULL;
+
+    return arg;
+}
+
+static CtAST* parseFuncBody(CtParser* self)
+{
+    CtAST* node;
+
+    if (parseConsume(self, K_SEMI))
+    {
+        node = NULL;
+    }
+    else if (parseConsume(self, K_ASSIGN))
+    {
+        node = parseExpr(self);
+        parseExpect(self, K_SEMI);
+    }
+    else if (parseConsume(self, K_LBRACE))
+    {
+        node = parseStmtList(self);
+    }
+    else
+    {
+        node = NULL;
+        /* error */
+    }
+
+    return node;
+}
+
+static CtAST* parseFunc(CtParser* self)
+{
+    CtAST* func = makeAST(AK_FUNCTION);
+    func->data.func.name = parseIdent(self);
+    func->data.func.args = parseConsume(self, K_LPAREN)
+        ? parseUntil(self, parseFuncArg, K_COMMA, K_RPAREN)
+        : makeArray(0);
+    func->data.func.result = parseConsume(self, K_ARROW)
+        ? parseType(self) : NULL;
+    func->data.func.body = parseFuncBody(self);
+
+    return func;
+}
+
 #define TRY_PARSE(node, expr) node = expr; if (node) return node;
 
 static CtAST* parseBody(CtParser* self)
@@ -1338,14 +1640,153 @@ static CtAST* parseBody(CtParser* self)
     {
         node = parseAlias(self);
     }
+    else if (parseConsume(self, K_STRUCT))
+    {
+        node = parseStruct(self);
+    }
+    else if (parseConsume(self, K_ENUM))
+    {
+        node = parseEnum(self);
+    }
+    else if (parseConsume(self, K_UNION))
+    {
+        node = parseUnion(self);
+    }
+    else if (parseConsume(self, K_VAR))
+    {
+        node = parseVar(self);
+    }
+    else if (parseConsume(self, K_DEF))
+    {
+        node = parseFunc(self);
+    }
 
     return node;
 }
 
+static CtAST* parseBranchLeaf(CtParser* self)
+{
+    CtAST* leaf = makeAST(AK_BRANCH_LEAF);
+
+    if (parseConsume(self, K_IF))
+    {
+        parseExpect(self, K_LPAREN);
+        leaf->data.leaf.cond = parseExpr(self);
+        parseExpect(self, K_RPAREN);
+    }
+    else
+    {
+        leaf->data.leaf.cond = NULL;
+    }
+
+    leaf->data.leaf.body = parseStmt(self);
+
+    return leaf;
+}
+
+static CtAST* parseBranchStmt(CtParser* self)
+{
+    CtASTArray branches = makeArray(4);
+
+    parseExpect(self, K_LPAREN);
+    CtAST* leaf = makeAST(AK_BRANCH_LEAF);
+    leaf->data.leaf.cond = parseExpr(self);
+    parseExpect(self, K_RPAREN);
+    leaf->data.leaf.body = parseStmt(self);
+
+    arrayAdd(&branches, leaf);
+
+    while (parseConsume(self, K_ELSE))
+    {
+        arrayAdd(&branches, parseBranchLeaf(self));
+    }
+
+    CtAST* node = makeAST(AK_BRANCH);
+    node->data.branches = branches;
+
+    return node;
+}
+
+static CtAST* parseForStmt(CtParser* self)
+{
+    CtAST* loop = makeAST(AK_FOR);
+    parseExpect(self, K_LPAREN);
+    loop->data.loop.names = parseVarNames(self);
+    parseExpect(self, K_STREAM);
+    loop->data.loop.range = parseExpr(self);
+    parseExpect(self, K_RPAREN);
+    loop->data.loop.body = parseStmt(self);
+
+    return loop;
+}
+
+static CtAST* parseWhileStmt(CtParser* self)
+{
+    CtAST* loop = makeAST(AK_WHILE);
+    parseExpect(self, K_LPAREN);
+    loop->data.wloop.cond = parseExpr(self);
+    parseExpect(self, K_RPAREN);
+    loop->data.wloop.cond = parseStmt(self);
+
+    return loop;
+}
+
+static CtAST* parseDoWhileStmt(CtParser* self)
+{
+    CtAST* loop = makeAST(AK_DO_WHILE);
+    loop->data.wloop.body = parseStmt(self);
+    parseExpect(self, K_WHILE);
+    parseExpect(self, K_LPAREN);
+    loop->data.wloop.cond = parseExpr(self);
+    parseExpect(self, K_RPAREN);
+    parseExpect(self, K_SEMI);
+
+    return loop;
+}
+
 static CtAST* parseStmt(CtParser* self)
 {
-    (void)self;
-    return NULL;
+    CtAST* node;
+
+    if (parseConsume(self, K_LBRACE))
+    {
+        node = parseStmtList(self);
+    }
+    else if (parseConsume(self, K_RETURN))
+    {
+        node = makeAST(AK_RETURN);
+        if (parseConsume(self, K_SEMI))
+        {
+            node->data.expr = NULL;
+        }
+        else
+        {
+            node->data.expr = parseExpr(self);
+            parseExpect(self, K_SEMI);
+        }
+    }
+    else if (parseConsume(self, K_IF))
+    {
+        node = parseBranchStmt(self);
+    }
+    else if (parseConsume(self, K_FOR))
+    {
+        node = parseForStmt(self);
+    }
+    else if (parseConsume(self, K_WHILE))
+    {
+        node = parseWhileStmt(self);
+    }
+    else if (parseConsume(self, K_DO))
+    {
+        node = parseDoWhileStmt(self);
+    }
+    else
+    {
+        node = parseExpr(self);
+    }
+
+    return node;
 }
 
 /**
@@ -1444,15 +1885,8 @@ CtToken ctLexNext(CtLexer* self)
     return tok;
 }
 
-void ctLexBeginTemplate(CtLexer* self)
-{
-    self->depth++;
-}
-
-void ctLexEndTemplate(CtLexer* self)
-{
-    self->depth--;
-}
+void ctLexBeginTemplate(CtLexer* self) { self->depth++; }
+void ctLexEndTemplate(CtLexer* self) { self->depth--; }
 
 void ctFreeToken(CtToken tok)
 {
