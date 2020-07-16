@@ -8,6 +8,14 @@ extern "C" {
 #endif
 
 typedef struct {
+    /* user data */
+    void* data;
+
+    void*(*alloc_func)(void*, size_t);
+    void(*free_func)(void*, void*);
+} CtAllocator;
+
+typedef struct {
     /* filename */
     const char* name;
 
@@ -391,13 +399,13 @@ typedef struct {
 
 typedef struct {
     CtASTArray name;
-    CtASTArray body;
-    CtASTArray args;
+
+    /* custom data provided by implementation parsers */
+    void* body;
+    void* args;
 } CtASTBuiltin;
 
 typedef struct {
-    CtASTArray attribs;
-
     CtASTArray imports;
     CtASTArray symbols;
 } CtASTUnit;
@@ -535,12 +543,26 @@ typedef struct CtAST {
     CtToken tok;
 } CtAST;
 
+struct CtParser;
+
+/* handle custom parsing sections */
 typedef struct {
+    /* the builtin name to match */
+    const char* name;
+
+    /* the function to use for custom parsing */
+    void*(*func)(struct CtParser*);
+} CtParseHandle;
+
+typedef struct CtParser {
     CtLexer* source;
     CtToken tok;
 
     /* the current array of attributes to add to the next ast node */
     CtASTArray attribs;
+
+    int n_handles;
+    CtParseHandle* handles;
 
     /* an error message if there is one */
     char* err;

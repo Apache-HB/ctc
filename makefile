@@ -10,11 +10,18 @@ CFLAGS = -Wextra -Weverything -Wall -Werror \
 	-fno-threadsafe-statics \
 	-ffreestanding
 
-setup:
-	mkdir -p build
+BUILDDIR = build
+SRCDIR = cthulhu
 
-interp: setup
-	$(CC) ctc/tools/interp.c -o build/cti $(CFLAGS)
+$(BUILDDIR)/cthulhu.o: $(SRCDIR)/cthulhu.c $(SRCDIR)/cthulhu.h
+	@mkdir -p build
+	$(CC) -c $(SRCDIR)/cthulhu.c -o $(BUILDDIR)/cthulhu.o $(CFLAGS)
 
-compile: setup
-	$(CC) ctc/tools/compile.c -o build/ctc $(CFLAGS)
+cti: $(BUILDDIR)/cthulhu.o $(SRCDIR)/tools/interp.c
+	$(CC) $(SRCDIR)/tools/interp.c -o $(BUILDDIR)/cti $(CFLAGS) $(BUILDDIR)/cthulhu.o
+
+ctc: $(BUILDDIR)/cthulhu.o $(SRCDIR)/tools/compile.c
+	$(CC) $(SRCDIR)/tools/compile.c -o $(BUILDDIR)/ctc $(CFLAGS) $(BUILDDIR)/cthulhu.o
+
+test: $(BUILDDIR)/cthulhu.o $(SRCDIR)/tools/test.c
+	$(CC) $(SRCDIR)/tools/test.c -o $(BUILDDIR)/test $(CFLAGS) $(BUILDDIR)/cthulhu.o

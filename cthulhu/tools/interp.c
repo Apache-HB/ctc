@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "ctc/ctc_impl.h"
+#include "cthulhu/cthulhu.h"
 
 #include <signal.h>
 
@@ -22,7 +22,7 @@ typedef struct {
 } CtMap;
 
 typedef struct {
-
+    void* stub;
 } CtFunction;
 
 typedef struct {
@@ -43,7 +43,7 @@ typedef struct CtScope {
 } CtScope;
 
 typedef struct {
-
+    void* stub;
 } CtInterp;
 
 int main(int argc, const char** argv)
@@ -55,6 +55,8 @@ int main(int argc, const char** argv)
     CtStream stream = ctStreamOpen(callbacks, stdin, "stdin");
     CtLexer lex = ctLexOpen(&stream);
     CtParser parse = ctParseOpen(&lex);
+
+    (void)parse;
 
     return 0;
 }

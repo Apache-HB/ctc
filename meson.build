@@ -1,7 +1,9 @@
 project('ctc', ['c', 'cpp'])
 
+cthulhu = library('cthulhu', 'cthulhu/cthulhu.c')
+
 sources = [
-    'ctc/tests/interp.c'
+    'cthulhu/tests/interp.c'
 ]
 
 cti = executable('cti', sources,

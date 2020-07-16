@@ -1,17 +1,16 @@
-#include "ctc.h"
+#include "cthulhu.h"
 
 #include <ctype.h>
 #include <string.h>
-#include <stdarg.h>
-
-#include <signal.h>
 
 /**
  * config stuff
  * substitute these functions as needed
+ *
+ * TODO: remove this
  */
 
-#include <stdlib.h>
+#include <malloc.h>
 
 #ifndef CT_MALLOC
 #   define CT_MALLOC(expr) malloc(expr)
@@ -24,10 +23,6 @@
 #ifndef CT_SPRINTF
 #   include "printf/printf.c"
 #   define CT_SPRINTF sprintf__
-#endif
-
-#ifndef CT_ERROR
-#   define CT_ERROR(data, msg)
 #endif
 
 /**
@@ -1043,35 +1038,6 @@ static CtAST* parseImport(CtParser* self)
 static CtAST* parseExpr(CtParser* self);
 static CtAST* parseType(CtParser* self);
 
-static CtASTArray collectTokens(CtParser* self, CtKeyword open, CtKeyword close)
-{
-    CtASTArray toks = makeArray(16);
-    int depth = 1;
-
-    while (1)
-    {
-        CtToken tok = parseNext(self);
-        if (tok.kind == TK_KEYWORD && tok.data.key == open)
-        {
-            depth++;
-        }
-        else if (tok.kind == TK_KEYWORD && tok.data.key == close)
-        {
-            depth--;
-
-            /* break here so we dont append the trailing closing brace */
-            if (!depth)
-                break;
-        }
-
-        CtAST* node = makeAST(AK_TOKEN);
-        node->tok = tok;
-        arrayAdd(&toks, node);
-    }
-
-    return toks;
-}
-
 static CtAST* parseCallArg(CtParser* self)
 {
     CtAST* arg = makeAST(AK_CALL_ARG);
@@ -1096,20 +1062,11 @@ static CtAST* parseBuiltin(CtParser* self)
 {
     CtASTArray name = parseMany(self, parseIdent, K_COLON2);
 
-    CtASTArray args = parseConsume(self, K_LPAREN)
-        ? parseUntil(self, parseCallArg, K_COMMA, K_RPAREN)
-        : makeArray(0);
+    /* TODO */
 
-    CtASTArray body = parseConsume(self, K_RBRACE)
-        ? collectTokens(self, K_LBRACE, K_RBRACE)
-        : makeArray(0);
-
-    CtAST* node = makeAST(AK_BUILTIN);
-    node->data.builtin.name = name;
-    node->data.builtin.args = args;
-    node->data.builtin.body = body;
-
-    return node;
+    //return node;
+    (void)name;
+    return NULL;
 }
 
 static CtAST* parseAttrib(CtParser* self)
@@ -1267,10 +1224,6 @@ static CtAST* parseClosure(CtParser* self)
     CtASTArray args = parseConsume(self, K_LPAREN)
         ? parseUntil(self, parseClosureArg, K_COMMA, K_RPAREN)
         : makeArray(0);
-    /* CtASTArray captures = parseConsume(self, K_LSQUARE)
-        : parseCaptures(self)
-        : makeArray(0); */
-
     /* TODO: captures */
     CtAST* result = parseConsume(self, K_ARROW) ? parseType(self) : NULL;
     CtAST* body = parseStmtList(self);
@@ -1364,9 +1317,6 @@ static CtAST* parsePrimaryExpr(CtParser* self)
             break;
         }
     }
-
-    if (!node)
-        printf("oh no %s\n", tokStr(tok));
 
     return node;
 }
@@ -1720,8 +1670,6 @@ static CtAST* parseFunc(CtParser* self)
     return func;
 }
 
-#define TRY_PARSE(node, expr) node = expr; if (node) return node;
-
 static CtAST* parseBody(CtParser* self)
 {
     CtAST* node = NULL;
@@ -1897,9 +1845,6 @@ static CtAST* parseStmt(CtParser* self)
         node = parseExpr(self);
         parseExpect(self, K_SEMI);
     }
-
-    if (!node)
-        printf("oh no\n");
 
     return node;
 }

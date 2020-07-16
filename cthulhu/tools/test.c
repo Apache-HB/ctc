@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#include "ctc/ctc_impl.h"
+#include "cthulhu/cthulhu.h"
 
 static int posixNext(void* stream) { return fgetc(stream); }
 
@@ -13,6 +13,8 @@ int main(int argc, const char** argv)
     CtStream stream = ctStreamOpen(callbacks, stdin, "stdin");
     CtLexer lex = ctLexOpen(&stream);
     CtParser parse = ctParseOpen(&lex);
+
+    (void)parse;
 
     return 0;
 }

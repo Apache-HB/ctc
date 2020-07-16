@@ -32,9 +32,6 @@
 #ifndef A_PRINTF_HH_
 #define A_PRINTF_HH_
 
-#include <stdarg.h>
-#include <stddef.h>
-
 /**
  * Tiny sprintf implementation
  * Due to security reasons (buffer overflow) YOU SHOULD CONSIDER USING (V)SNPRINTF INSTEAD!
