@@ -13,12 +13,8 @@ CFLAGS = -Wextra -Weverything -Wall -Werror \
 setup:
 	mkdir -p build
 
-test: setup
-	$(CC) ctc/tests/test.c -o build/test $(CFLAGS)
-
 interp: setup
-	$(CC) ctc/tests/interp.c -o build/interp $(CFLAGS)
+	$(CC) ctc/tools/interp.c -o build/cti $(CFLAGS)
 
-validate: setup
-	$(CC) ctc/tests/validate.c -o build/validate $(CFLAGS)
-	
+compile: setup
+	$(CC) ctc/tools/compile.c -o build/ctc $(CFLAGS)

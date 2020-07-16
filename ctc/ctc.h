@@ -148,6 +148,9 @@ typedef enum {
     /* a single identifier */
     AK_IDENT,
 
+    /* a raw token, used for custom parsing */
+    AK_TOKEN,
+
     /* a type is always an array of qualified types */
     AK_TYPE,
 
@@ -173,6 +176,8 @@ typedef enum {
     AK_INIT_ARG,
     AK_CALL_ARG,
     AK_SUBSCRIPT,
+    AK_CLOSURE,
+    AK_CAPTURE,
 
     /* toplevel declarations */
     AK_IMPORT,
@@ -182,6 +187,8 @@ typedef enum {
     AK_ENUM,
     AK_VAR,
     AK_FUNCTION,
+    AK_ATTRIB,
+    AK_BUILTIN,
 
     AK_FIELD,
     AK_ENUM_FIELD,
@@ -198,7 +205,7 @@ typedef enum {
     AK_FOR,
     AK_DO_WHILE,
 
-    AK_UNIT,
+    AK_UNIT
 } CtASTKind;
 
 typedef struct {
@@ -262,17 +269,23 @@ typedef struct {
 typedef struct {
     struct CtAST* name;
     CtASTArray fields;
+
+    CtASTArray attribs;
 } CtASTStruct;
 
 typedef struct {
     struct CtAST* name;
     CtASTArray fields;
+
+    CtASTArray attribs;
 } CtASTUnion;
 
 typedef struct {
     struct CtAST* name;
     struct CtAST* backing;
     CtASTArray fields;
+
+    CtASTArray attribs;
 } CtASTEnum;
 
 typedef struct {
@@ -284,6 +297,8 @@ typedef struct {
 typedef struct {
     CtASTArray names;
     struct CtAST* init;
+
+    CtASTArray attribs;
 } CtASTVar;
 
 typedef struct {
@@ -302,7 +317,26 @@ typedef struct {
     CtASTArray args;
     struct CtAST* result;
     struct CtAST* body;
+
+    CtASTArray attribs;
 } CtASTFunction;
+
+typedef enum {
+    ACT_REF,
+    ACT_VALUE
+} CtASTCaptureType;
+
+typedef struct {
+    struct CtAST* symbol;
+    CtASTCaptureType type;
+} CtASTCapture;
+
+typedef struct {
+    struct CtAST* result;
+    CtASTArray args;
+    CtASTArray captures;
+    struct CtAST* body;
+} CtASTClosure;
 
 typedef struct {
     struct CtAST* cond;
@@ -351,6 +385,19 @@ typedef struct {
 } CtASTImport;
 
 typedef struct {
+    CtASTArray name;
+    CtASTArray args;
+} CtASTAttrib;
+
+typedef struct {
+    CtASTArray name;
+    CtASTArray body;
+    CtASTArray args;
+} CtASTBuiltin;
+
+typedef struct {
+    CtASTArray attribs;
+
     CtASTArray imports;
     CtASTArray symbols;
 } CtASTUnit;
@@ -461,6 +508,18 @@ typedef union {
     /* AK_SUBSCRIPT */
     CtASTSubscript subscript;
 
+    /* AK_ATTRIB */
+    CtASTAttrib attrib;
+
+    /* AK_BUILTIN */
+    CtASTBuiltin builtin;
+
+    /* AK_CLOSURE */
+    CtASTClosure closure;
+
+    /* AK_CAPTURE */
+    CtASTCapture capture;
+
     /* AK_IMPORT, we name it include because import is a c++20 keyword */
     CtASTImport include;
 
@@ -480,6 +539,9 @@ typedef struct {
     CtLexer* source;
     CtToken tok;
 
+    /* the current array of attributes to add to the next ast node */
+    CtASTArray attribs;
+
     /* an error message if there is one */
     char* err;
     /* the current node being parsed */
@@ -489,7 +551,6 @@ typedef struct {
 CtParser ctParseOpen(CtLexer* source);
 
 CtAST* ctParseUnit(CtParser* self);
-CtAST* ctParseInterp(CtParser* self);
 
 #ifdef __cplusplus
 }

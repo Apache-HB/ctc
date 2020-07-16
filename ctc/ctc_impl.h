@@ -844,36 +844,8 @@ static CtNumber lexDigit(CtLexer* self, int c)
 
 #define IN_TEMPLATE(self, ...) { ctLexBeginTemplate(self->source); __VA_ARGS__ ctLexEndTemplate(self->source); }
 
-static char* astStr(CtAST* ast)
-{
-    char* out = NULL;
-
-    if (ast->kind == AK_LITERAL && ast->tok.kind == TK_INT)
-    {
-        CT_FMT_ARGS(out, "INT(%d)", ast->tok.data.digit.digit)
-    }
-    else if (ast->kind == AK_BINOP)
-    {
-        char* lhs = astStr(ast->data.binop.lhs);
-        char* rhs = astStr(ast->data.binop.rhs);
-        CT_FMT_ARGS(out, "BINOP(%s, %s, %s)", lhs, keyStr(ast->data.binop.op), rhs)
-        CT_FREE(lhs);
-        CT_FREE(rhs);
-    }
-    else if (ast->kind == AK_UNARY)
-    {
-        char* it = astStr(ast->data.expr);
-        CT_FMT_ARGS(out, "UNARY(%s, %s)", keyStr(ast->tok.data.key), it)
-        CT_FREE(it);
-    }
-
-    return out;
-}
-
 static CtASTArray makeArray(size_t size)
 {
-    (void)astStr;
-
     CtASTArray arr = { CT_MALLOC(sizeof(CtAST) * size), size, 0 };
 
     return arr;
@@ -891,6 +863,15 @@ static void arrayAdd(CtASTArray* self, CtAST* item)
     }
 
     self->data[self->len++] = *item;
+}
+
+static CtAST* parseStmtList(CtParser* self);
+
+static CtASTArray takeAttribs(CtParser* self)
+{
+    CtASTArray temp = self->attribs;
+    self->attribs = makeArray(4);
+    return temp;
 }
 
 static CtAST* makeAST(CtASTKind kind)
@@ -1059,6 +1040,92 @@ static CtAST* parseImport(CtParser* self)
     return node;
 }
 
+static CtAST* parseExpr(CtParser* self);
+static CtAST* parseType(CtParser* self);
+
+static CtASTArray collectTokens(CtParser* self, CtKeyword open, CtKeyword close)
+{
+    CtASTArray toks = makeArray(16);
+    int depth = 1;
+
+    while (1)
+    {
+        CtToken tok = parseNext(self);
+        if (tok.kind == TK_KEYWORD && tok.data.key == open)
+        {
+            depth++;
+        }
+        else if (tok.kind == TK_KEYWORD && tok.data.key == close)
+        {
+            depth--;
+
+            /* break here so we dont append the trailing closing brace */
+            if (!depth)
+                break;
+        }
+
+        CtAST* node = makeAST(AK_TOKEN);
+        node->tok = tok;
+        arrayAdd(&toks, node);
+    }
+
+    return toks;
+}
+
+static CtAST* parseCallArg(CtParser* self)
+{
+    CtAST* arg = makeAST(AK_CALL_ARG);
+
+    if (parseConsume(self, K_LSQUARE))
+    {
+        arg->data.carg.name = parseIdent(self);
+        parseExpect(self, K_RSQUARE);
+        parseExpect(self, K_ASSIGN);
+    }
+    else
+    {
+        arg->data.carg.name = NULL;
+    }
+
+    arg->data.carg.val = parseExpr(self);
+
+    return arg;
+}
+
+static CtAST* parseBuiltin(CtParser* self)
+{
+    CtASTArray name = parseMany(self, parseIdent, K_COLON2);
+
+    CtASTArray args = parseConsume(self, K_LPAREN)
+        ? parseUntil(self, parseCallArg, K_COMMA, K_RPAREN)
+        : makeArray(0);
+
+    CtASTArray body = parseConsume(self, K_RBRACE)
+        ? collectTokens(self, K_LBRACE, K_RBRACE)
+        : makeArray(0);
+
+    CtAST* node = makeAST(AK_BUILTIN);
+    node->data.builtin.name = name;
+    node->data.builtin.args = args;
+    node->data.builtin.body = body;
+
+    return node;
+}
+
+static CtAST* parseAttrib(CtParser* self)
+{
+    CtASTArray path = parseMany(self, parseIdent, K_COLON2);
+    CtASTArray args = parseConsume(self, K_LPAREN)
+        ? parseUntil(self, parseCallArg, K_COMMA, K_RPAREN)
+        : makeArray(0);
+
+    CtAST* attrib = makeAST(AK_ATTRIB);
+    attrib->data.attrib.name = path;
+    attrib->data.attrib.args = args;
+
+    return attrib;
+}
+
 typedef enum {
     OP_ERROR = 0,
 
@@ -1107,9 +1174,6 @@ static CtOpPrec binopPrec(CtToken tok)
     }
 }
 
-static CtAST* parseExpr(CtParser* self);
-static CtAST* parseType(CtParser* self);
-
 static CtAST* parseCoerce(CtParser* self)
 {
     CtAST* node = makeAST(AK_COERCE);
@@ -1124,26 +1188,6 @@ static CtAST* parseCoerce(CtParser* self)
     parseExpect(self, K_RPAREN);
 
     return node;
-}
-
-static CtAST* parseCallArg(CtParser* self)
-{
-    CtAST* arg = makeAST(AK_CALL_ARG);
-
-    if (parseConsume(self, K_LSQUARE))
-    {
-        arg->data.carg.name = parseIdent(self);
-        parseExpect(self, K_RSQUARE);
-        parseExpect(self, K_ASSIGN);
-    }
-    else
-    {
-        arg->data.carg.name = NULL;
-    }
-
-    arg->data.carg.val = parseExpr(self);
-
-    return arg;
 }
 
 static CtAST* parseCall(CtParser* self, CtAST* lhs)
@@ -1210,6 +1254,35 @@ static CtAST* parseDeref(CtParser* self, CtAST* lhs)
     return node;
 }
 
+static CtAST* parseClosureArg(CtParser* self)
+{
+    CtAST* arg = makeAST(AK_FUNC_ARG);
+    arg->data.arg.name = parseIdent(self);
+    arg->data.arg.type = parseConsume(self, K_COLON) ? parseType(self) : NULL;
+    return arg;
+}
+
+static CtAST* parseClosure(CtParser* self)
+{
+    CtASTArray args = parseConsume(self, K_LPAREN)
+        ? parseUntil(self, parseClosureArg, K_COMMA, K_RPAREN)
+        : makeArray(0);
+    /* CtASTArray captures = parseConsume(self, K_LSQUARE)
+        : parseCaptures(self)
+        : makeArray(0); */
+
+    /* TODO: captures */
+    CtAST* result = parseConsume(self, K_ARROW) ? parseType(self) : NULL;
+    CtAST* body = parseStmtList(self);
+
+    CtAST* closure = makeAST(AK_CLOSURE);
+    closure->data.closure.args = args;
+    closure->data.closure.result = result;
+    closure->data.closure.body = body;
+
+    return closure;
+}
+
 static CtAST* parsePrimaryExpr(CtParser* self)
 {
     CtToken tok = parsePeek(self);
@@ -1240,6 +1313,13 @@ static CtAST* parsePrimaryExpr(CtParser* self)
             node = makeAST(AK_INIT);
             node->data.init.type = NULL;
             node->data.init.args = parseUntil(self, parseInitArg, K_COMMA, K_RBRACE);
+            break;
+        case K_AT:
+            node = parseBuiltin(self);
+            break;
+        case K_DEF:
+            parseNext(self);
+            node = parseClosure(self);
             break;
         default:
             /* error */
@@ -1498,6 +1578,8 @@ static CtAST* parseStruct(CtParser* self)
     parseExpect(self, K_LBRACE);
     struc->data.struc.fields = parseUntilEnd(self, parseField, K_RBRACE);
 
+    struc->data.struc.attribs = takeAttribs(self);
+
     return struc;
 }
 
@@ -1508,6 +1590,8 @@ static CtAST* parseUnion(CtParser* self)
 
     parseExpect(self, K_LBRACE);
     uni->data.uni.fields = parseUntilEnd(self, parseField, K_RBRACE);
+
+    uni->data.uni.attribs = takeAttribs(self);
 
     return uni;
 }
@@ -1530,6 +1614,8 @@ static CtAST* parseEnum(CtParser* self)
 
     parseExpect(self, K_LBRACE);
     enu->data.enu.fields = parseUntil(self, parseEnumField, K_COMMA, K_RBRACE);
+
+    enu->data.enu.attribs = takeAttribs(self);
 
     return enu;
 }
@@ -1566,6 +1652,8 @@ static CtAST* parseVar(CtParser* self)
     node->data.var.init = parseConsume(self, K_ASSIGN) ? parseExpr(self) : NULL;
 
     parseExpect(self, K_SEMI);
+
+    node->data.var.attribs = takeAttribs(self);
 
     return node;
 }
@@ -1627,6 +1715,8 @@ static CtAST* parseFunc(CtParser* self)
         ? parseType(self) : NULL;
     func->data.func.body = parseFuncBody(self);
 
+    func->data.func.attribs = takeAttribs(self);
+
     return func;
 }
 
@@ -1659,6 +1749,19 @@ static CtAST* parseBody(CtParser* self)
     else if (parseConsume(self, K_DEF))
     {
         node = parseFunc(self);
+    }
+    else if (parseConsume(self, K_AT))
+    {
+        if (parseConsume(self, K_LSQUARE))
+        {
+            do { arrayAdd(&self->attribs, parseAttrib(self)); } while (parseConsume(self, K_LPAREN));
+            parseExpect(self, K_RSQUARE);
+            node = parseBody(self);
+        }
+        else
+        {
+            node = parseBuiltin(self);
+        }
     }
 
     return node;
@@ -1912,6 +2015,7 @@ CtParser ctParseOpen(CtLexer* source)
     self.tok.kind = TK_INVALID;
     self.err = NULL;
     self.node = NULL;
+    self.attribs = makeArray(4);
 
     return self;
 }
@@ -1922,19 +2026,6 @@ CtAST* ctParseUnit(CtParser* self)
 
     node->data.unit.imports = parseCollect(self, parseImport);
     node->data.unit.symbols = parseCollect(self, parseBody);
-
-    return node;
-}
-
-CtAST* ctParseInterp(CtParser* self)
-{
-    CtAST* node = NULL;
-
-    TRY_PARSE(node, parseExpr(self))
-
-    TRY_PARSE(node, parseImport(self))
-    TRY_PARSE(node, parseBody(self))
-    TRY_PARSE(node, parseStmt(self))
 
     return node;
 }

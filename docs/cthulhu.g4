@@ -6,25 +6,35 @@ unit : importDecl* bodyDecl* EOF ;
 // interpreting a file
 interp : (importDecl | bodyDecl | stmt)* EOF ;
 
-importDecl : 'import' importPath importSpec? ';' ;
+attrib : path ('(' callArgs? ')')? ;
 
-importPath : Ident ('::' Ident)* ;
+// this is implementation defined behaviour and is left here as a stub
+IDB : ' ' ;
+
+builtinBody : '{' IDB '}' | '(' callArgs? ')' ('{' IDB '}')? ;
+builtin : '@' path builtinBody? ';' ;
+
+attribute : '@' '[' attrib (',' attrib)*  ']' ;
+
+importDecl : 'import' path importSpec? ';' ;
+
+path : Ident ('::' Ident)* ;
 importSpec : '(' Ident (',' Ident)* ')' ;
 
-bodyDecl : funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl ;
+bodyDecl : builtin | funcDecl | varDecl | aliasDecl | structDecl | unionDecl | enumDecl | objectDecl ;
 
 objectField : (varDecl | aliasDecl | funcDecl) ;
-objectDecl : 'object' Ident templateArgs? '{' objectField* '}' ;
+objectDecl : attribute* 'object' Ident templateArgs? '{' objectField* '}' ;
 
 field : Ident ':' type ';' ;
 
-structDecl : 'struct' Ident templateArgs? '{' field* '}' ;
-unionDecl : 'union' Ident templateArgs? '{' field+ '}' ;
+structDecl : attribute* 'struct' Ident templateArgs? '{' field* '}' ;
+unionDecl : attribute* 'union' Ident templateArgs? '{' field+ '}' ;
 
 enumData : '{' field* '}' ;
 enumField : Ident enumData? ('=' expr)? ;
 enumFields : enumField (',' enumField)* ;
-enumDecl : 'enum' Ident templateArgs? (':' type)? '{' enumFields? '}' ;
+enumDecl : attribute* 'enum' Ident templateArgs? (':' type)? '{' enumFields? '}' ;
 
 // TODO: allow custom constraints on template args
 templateArg : Ident (':' funcType)? ('=' type)? ;
@@ -32,21 +42,21 @@ templateArgsBody : templateArg (',' templateArg)* ;
 
 templateArgs : '<' templateArgsBody '>' ;
 
-funcDecl : 'def' funcName templateArgs? funcArgs? funcTail? funcBody ;
+funcDecl : attribute* 'def' funcName templateArgs? funcArgs? funcTail? funcBody ;
 funcName : Ident ;
 funcArgs : '(' funcArg (',' funcArg)* ')' ;
 funcArg : Ident ':' type ('=' expr)? ;
 funcTail : '->' type ;
 funcBody : stmtList | '=' expr ';' | ';' ;
 
-varDecl : 'var' varNames ('=' expr) ';' ;
+varDecl : attribute* 'var' varNames ('=' expr) ';' ;
 varName : Ident (':' type) ;
 varNames : varName | '[' varName (',' varName)* ']' ;
 
 aliasDecl : 'alias' Ident templateArgs? '=' aliasBody ';' ;
 aliasBody : type ;
 
-stmt : stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | expr ';' | ';' ;
+stmt : builtin | stmtList | returnStmt | forStmt | whileStmt | ifStmt | varDecl | aliasDecl | expr ';' | ';' ;
 
 // we use <| to solve some abiguity with varNames
 forStmt : 'for' varNames '<|' expr stmt ;
