@@ -1,11 +1,9 @@
-project('ctc', ['c', 'cpp'])
+project('cthulhu', 'c',
+    default_options : [
+        'c_std=c99',
+        'werror=true',
+        'warning_level=3'
+    ]
+)
 
 cthulhu = library('cthulhu', 'cthulhu/cthulhu.c')
-
-sources = [
-    'cthulhu/tests/interp.c'
-]
-
-cti = executable('cti', sources,
-    include_directories : include_directories('.')
-)

@@ -1,6 +1,8 @@
 #pragma once
 
+extern "C" {
 #include "cthulhu.h"
+}
 
 namespace cthulhu
 {

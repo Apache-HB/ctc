@@ -1,0 +1,32 @@
+import std::rt::io;
+import std::types(String);
+import std::traits(Debug, Display);
+
+trait Zero(T) {
+    def zero -> T;
+}
+
+def compare_prints<T: Debug + Display>(it: &T) {
+    io::print("debug: {s}", it.debug());
+    io::print("display: {s}", it.display());
+}
+
+object Pair!<L: Display, R: Display>(Display, Debug) {
+    @[const, private] var left: L;
+    @[const, private] var right: R;
+
+    alias Self = Pair!<L, R>;
+    alias CSelf = @[const] Self;
+
+    def new(l: L, r: R) -> Self = { l, r };
+
+    def debug(self: &CSelf) -> String {
+        String out = String::from(left.debug(), right.debug());
+
+        return out;
+    }
+}
+
+object float32(Zero) {
+    def zero -> __builtin::float32::new(0, 0);
+}

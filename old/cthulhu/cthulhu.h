@@ -3,10 +3,6 @@
 
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct {
     /* user data */
     void* data;
@@ -573,9 +569,5 @@ typedef struct CtParser {
 CtParser ctParseOpen(CtLexer* source);
 
 CtAST* ctParseUnit(CtParser* self);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* CTC_H */
