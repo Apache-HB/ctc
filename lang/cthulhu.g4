@@ -111,7 +111,7 @@ lambda : '=>' expr | stmts ;
 closure : 'def' cparams? result? lambda;
 
 
-stmt : stmts | expr | var | return | alias | for | while | if | branch | builtin | SEMI ;
+stmt : stmts | expr | var | return | alias | for | while | if | branch | builtin | 'break' SEMI | 'continue' SEMI | SEMI ;
 
 if : 'if' '(' expr ')' stmt ('else' 'if' '(' expr ')' stmt)* ('else' stmt)? ;
 while : 'while' '(' expr ')' stmt ;
@@ -141,7 +141,7 @@ Ident : [a-zA-Z_][a-zA-Z0-9_]* ;
 fragment SingleString : '"' Letter* '"' ;
 fragment MultiString : 'R"' .*? '"' ;
 
-fragment Letter : '\\' ['"ntv\\] | ~[\\\r\n] ;
+fragment Letter : '\\' ['"ntv0\\] | ~[\\\r\n] ;
 
 fragment Base2 : '0b' [01]+ ;
 fragment Base10 : [0-9]+ ;
