@@ -397,7 +397,7 @@ static void lexSymbol(CtLexer *self, CtToken *tok, int c)
          * NOTE: the self->depth == 0 check has to be first due to
          * short circuiting rules
          */
-        if (!self->depth)
+        if (self->depth)
         {
             /* inside a template */
             self->depth--;

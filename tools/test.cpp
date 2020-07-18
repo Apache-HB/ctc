@@ -10,7 +10,7 @@ using namespace std::literals;
 
 int main()
 {
-    std::istream* in = new std::stringstream("ident");
+    std::istream* in = new std::stringstream("!<!<>> >> >");
 
     CtAllocator alloc;
     alloc.alloc = [](void*, size_t size) { return malloc(size); };
@@ -30,9 +30,49 @@ int main()
 
     auto tok = ctLexerNext(&lex);
 
-    if (tok.kind != TK_IDENT || tok.data.ident != "ident"sv)
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_TBEGIN)
     {
-        printf("oh no %s\n", tok.data.str.str);
+        printf("1oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_TBEGIN)
+    {
+        printf("2oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_TEND)
+    {
+        printf("3oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_TEND)
+    {
+        printf("4oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_SHR)
+    {
+        printf("5oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_LT)
+    {
+        printf("6oh no %d\n", tok.data.key);
         return 1;
     }
 }
