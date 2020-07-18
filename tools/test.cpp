@@ -5,12 +5,13 @@
 #include <string>
 #include <string_view>
 #include <iostream>
+#include <cstring>
 
 using namespace std::literals;
 
 int main()
 {
-    std::istream* in = new std::stringstream("!<!<>> >> >");
+    std::istream* in = new std::stringstream("!<!<>> >> > qword dword");
 
     CtAllocator alloc;
     alloc.alloc = [](void*, size_t size) { return malloc(size); };
@@ -30,7 +31,7 @@ int main()
 
     auto tok = ctLexerNext(&lex);
 
-    if (tok.kind != TK_KEYWORD || tok.data.key != K_TBEGIN)
+    if (tok.kind != TK_KEYWORD || tok.data.key != K_TBEGIN || tok.len != 2)
     {
         printf("1oh no %d\n", tok.data.key);
         return 1;
@@ -73,6 +74,24 @@ int main()
     if (tok.kind != TK_KEYWORD || tok.data.key != K_LT)
     {
         printf("6oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_USER_KEYWORD || tok.data.key != 3)
+    {
+        printf("6oh no %d\n", tok.data.key);
+        return 1;
+    }
+
+    ctResetKeys(&lex);
+
+    tok = ctLexerNext(&lex);
+
+    if (tok.kind != TK_IDENT || tok.data.ident != "dword"sv || tok.len != std::strlen("dword"))
+    {
+        printf("6oh no %s %ld\n", tok.data.ident, tok.len);
         return 1;
     }
 }

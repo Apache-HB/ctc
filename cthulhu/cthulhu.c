@@ -582,7 +582,8 @@ CtToken ctLexerNext(CtLexer *self)
         lexSymbol(self, &tok, c);
     }
 
-    tok.len = self->len;
+    /* add 1 here to account for lookahead token */
+    tok.len = self->len + 1;
 
     return tok;
 }
@@ -601,19 +602,6 @@ void ctFreeToken(CtToken tok, CtAllocator alloc)
         if (tok.data.num.suffix)
             alloc.dealloc(alloc.data, tok.data.num.suffix);
         break;
-    default:
-        break;
-    }
-}
-
-void ctFormatToken(CtToken tok, char *buf, CtSize *len)
-{
-    switch (tok.kind)
-    {
-    case TK_EOF:
-        *len = CT_SNPRINTF(buf, *len, "EOF");
-        break;
-        /* TODO */
     default:
         break;
     }
