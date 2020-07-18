@@ -1,8 +1,8 @@
 #include "cthulhu.h"
 
-#include <string.h>
-#include <stdint.h>
-#include <stdio.h>
+#include "printf.c"
+
+#define CT_SNPRINTF snprintf__
 
 /**
  * utils
@@ -14,6 +14,23 @@ static int isLetter(int c) { return ('a' <= c && c <= 'z') || ('A' <= c && c <= 
 static int isIdent1(int c) { return isLetter(c) || c == '_'; }
 static int isIdent2(int c) { return isIdent1(c) || isDigit(c); }
 static int isSpace(int c) { return c == ' ' || c == '\n' || c == '\t' || c == '\v'; }
+
+static void memCopy(void *dst, const void *src, CtSize size)
+{
+    for (CtSize i = 0; i < size; i++)
+        ((char*)dst)[i] = ((const char*)src)[i];
+}
+
+static int strEq(const char *lhs, const char *rhs)
+{
+    while (*lhs && (*lhs == *rhs))
+    {
+        lhs++;
+        rhs++;
+    }
+
+    return !(*lhs - *rhs);
+}
 
 #define CT_MALLOC(ctx, size) (alloc.alloc(alloc.data, (size)))
 #define CT_FREE(ctx, addr) (alloc.dealloc(alloc.data, (addr)))
@@ -50,7 +67,7 @@ void bufPush(CtAllocator alloc, StrBuffer *buf, char c)
         temp = buf->ptr;
         buf->alloc += 32;
         buf->ptr = CT_MALLOC(alloc, buf->alloc + 1);
-        memcpy(buf->ptr, temp, buf->len + 1);
+        memCopy(buf->ptr, temp, buf->len + 1);
         CT_FREE(alloc, temp);
     }
 
@@ -208,6 +225,10 @@ static void lexDigit(CtLexer *self, CtToken *tok, int c)
 
         digit.suffix = buf.ptr;
     }
+    else
+    {
+        digit.suffix = NULL;
+    }
 
     tok->kind = TK_INT;
     tok->data.num = digit;
@@ -235,7 +256,7 @@ static void lexIdent(CtLexer *self, CtToken *tok, int c)
 
     for (CtSize i = 0; i < KEY_TABLE_SIZE; i++)
     {
-        if (strcmp(buf.ptr, key_table[i].str) == 0)
+        if (strEq(buf.ptr, key_table[i].str))
         {
             tok->kind = TK_KEYWORD;
             tok->data.key = key_table[i].key;
@@ -245,7 +266,7 @@ static void lexIdent(CtLexer *self, CtToken *tok, int c)
 
     for (CtSize i = 0; i < self->nkeys; i++)
     {
-        if (strcmp(buf.ptr, self->ukeys[i].str) == 0)
+        if (strEq(buf.ptr, self->ukeys[i].str))
         {
             tok->kind = TK_USER_KEYWORD;
             tok->data.ukey = self->ukeys[i].id;
@@ -564,4 +585,36 @@ CtToken ctLexerNext(CtLexer *self)
     tok.len = self->len;
 
     return tok;
+}
+
+void ctFreeToken(CtToken tok, CtAllocator alloc)
+{
+    switch (tok.kind)
+    {
+    case TK_IDENT:
+        alloc.dealloc(alloc.data, tok.data.ident);
+        break;
+    case TK_STRING:
+        alloc.dealloc(alloc.data, tok.data.str.str);
+        break;
+    case TK_INT:
+        if (tok.data.num.suffix)
+            alloc.dealloc(alloc.data, tok.data.num.suffix);
+        break;
+    default:
+        break;
+    }
+}
+
+void ctFormatToken(CtToken tok, char *buf, CtSize *len)
+{
+    switch (tok.kind)
+    {
+    case TK_EOF:
+        *len = CT_SNPRINTF(buf, *len, "EOF");
+        break;
+        /* TODO */
+    default:
+        break;
+    }
 }

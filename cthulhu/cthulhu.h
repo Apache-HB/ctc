@@ -127,5 +127,7 @@ void ctResetKeys(CtLexer *self);
 CtLexer ctLexerNew(void *data, CtLexerNextFunc next, CtAllocator alloc);
 
 CtToken ctLexerNext(CtLexer *self);
+void ctFreeToken(CtToken tok, CtAllocator alloc);
+void ctFormatToken(CtToken tok, char *buf, CtSize *len);
 
 #endif /* CTHULHU_H */
