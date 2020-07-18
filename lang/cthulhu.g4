@@ -118,9 +118,10 @@ while : 'while' '(' expr ')' stmt ;
 
 branch : 'branch' '(' expr ')' '{' branches* '}' ;
 branches : case '=>' stmt ;
-case : expr varNames? ;
+case : expr destructure? ;
+destructure : '{' Ident (',' Ident)* '}' ;
 
-forBody : var SEMI expr? SEMI expr? | varNames '<|' expr ;
+forBody : var? SEMI expr? SEMI expr? | varNames '<<' expr ;
 for : 'for' '(' forBody ')' stmt ;
 
 return : 'return' expr? SEMI ;
