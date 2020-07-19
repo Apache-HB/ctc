@@ -11,12 +11,6 @@ typedef void*(*CtAllocFunc)(void*, CtSize);
 typedef void(*CtDeallocFunc)(void*, void*);
 
 typedef struct {
-    void *data;
-    CtAllocFunc alloc;
-    CtDeallocFunc dealloc;
-} CtAllocator;
-
-typedef struct {
     CtSize dist;
     CtSize line;
     CtSize col;
@@ -35,11 +29,15 @@ typedef enum {
     TK_LOOKAHEAD
 } CtTokenKind;
 
+#define CT_MULTILINE_FLAG (1ULL << 63)
+
 typedef struct {
     /* hold the length in bytes because strings can have null bytes in them */
     CtSize len;
     char *str;
 } CtString;
+
+#define CT_STRLEN(str) (str.len & ~CT_MULTILINE_FLAG)
 
 typedef enum {
     DE_BASE2, DE_BASE10, DE_BASE16
@@ -83,7 +81,7 @@ typedef union {
     /* TK_EOF, TK_LOOKAHEAD */
 } CtTokenData;
 
-typedef struct {
+typedef struct CtToken {
     CtTokenKind kind;
     CtTokenData data;
     CtPosition pos;
@@ -99,9 +97,30 @@ typedef struct {
     CtUserKey id;
 } CtUserKeyword;
 
+typedef enum {
+    /* no error */
+    ERR_NONE,
+    /* integer overflow */
+    ERR_OVERFLOW,
+    /* bad escape sequence in string/char literal */
+    ERR_INVALID_ESCAPE,
+
+    /* EOF inside a string/char literal */
+    ERR_EOF,
+
+    /* newline inside a single line string/char literal */
+    ERR_NEWLINE,
+
+    /* missing trailing ' in a char literal */
+    ERR_UNTERMINATED,
+
+    /* invalid symbol while lexing */
+    ERR_INVALID_SYMBOL
+} CtError;
+
 typedef struct {
     /* stream state */
-    void *data;
+    void *stream;
     CtLexerNextFunc next;
     int ahead;
 
@@ -117,16 +136,20 @@ typedef struct {
     /* current template depth */
     int depth;
 
-    /* allocator */
-    CtAllocator alloc;
+    CtError err;
+    void *udata;
 } CtLexer;
 
 void ctSetKeys(CtLexer *self, const CtUserKeyword *keys, CtSize num);
 void ctResetKeys(CtLexer *self);
 
-CtLexer ctLexerNew(void *data, CtLexerNextFunc next, CtAllocator alloc);
+CtLexer ctLexerNew(void *stream, CtLexerNextFunc next, void *udata);
 
 CtToken ctLexerNext(CtLexer *self);
-void ctFreeToken(CtToken tok, CtAllocator alloc);
+void ctFreeToken(CtToken tok);
+
+typedef struct {
+    CtLexer lex;
+} CtParser;
 
 #endif /* CTHULHU_H */

@@ -1,8 +1,12 @@
 #include "cthulhu.h"
 
-#include "printf.c"
+#if !defined(CT_MALLOC) || !defined(CT_FREE)
+#   error "CT_MALLOC and CT_FREE must be defined"
+#endif
 
-#define CT_SNPRINTF snprintf__
+#ifndef CT_ERROR
+#   error "CT_ERROR must be defined"
+#endif
 
 /**
  * utils
@@ -32,9 +36,6 @@ static int strEq(const char *lhs, const char *rhs)
     return !(*lhs - *rhs);
 }
 
-#define CT_MALLOC(ctx, size) (alloc.alloc(alloc.data, (size)))
-#define CT_FREE(ctx, addr) (alloc.dealloc(alloc.data, (addr)))
-
 /**
  * lexer internals
  */
@@ -45,10 +46,10 @@ typedef struct {
     CtSize alloc;
 } StrBuffer;
 
-StrBuffer bufNew(CtAllocator alloc, CtSize size)
+StrBuffer bufNew(CtSize size)
 {
     StrBuffer buf = {
-        .ptr = CT_MALLOC(alloc, size),
+        .ptr = CT_MALLOC(size),
         .len = 0,
         .alloc = size
     };
@@ -58,7 +59,7 @@ StrBuffer bufNew(CtAllocator alloc, CtSize size)
     return buf;
 }
 
-void bufPush(CtAllocator alloc, StrBuffer *buf, char c)
+void bufPush(StrBuffer *buf, char c)
 {
     char *temp;
 
@@ -66,22 +67,19 @@ void bufPush(CtAllocator alloc, StrBuffer *buf, char c)
     {
         temp = buf->ptr;
         buf->alloc += 32;
-        buf->ptr = CT_MALLOC(alloc, buf->alloc + 1);
+        buf->ptr = CT_MALLOC(buf->alloc + 1);
         memCopy(buf->ptr, temp, buf->len + 1);
-        CT_FREE(alloc, temp);
+        CT_FREE(temp);
     }
 
     buf->ptr[buf->len++] = c;
     buf->ptr[buf->len] = '\0';
 }
 
-#define BUF_NEW(size) bufNew(self->alloc, size)
-#define BUF_PUSH(buf, c) bufPush(self->alloc, buf, (char)c)
-
 static int lexNext(CtLexer *self)
 {
     int c = self->ahead;
-    self->ahead = self->next(self->data);
+    self->ahead = self->next(self->stream);
 
     self->len++;
     self->pos.dist++;
@@ -143,7 +141,7 @@ static int lexSkip(CtLexer *self)
 
 /* mom said its my turn on the unreadable macro */
 #define LEX_COLLECT(limit, c, pattern, ...) { int i = 0; while (1) { \
-    c = lexPeek(self); if (pattern) { __VA_ARGS__ lexNext(self); if (i++ > limit) { /* overflow */ break; } } else { break; } } }
+    c = lexPeek(self); if (pattern) { __VA_ARGS__ lexNext(self); if (i++ > limit) { self->err = ERR_OVERFLOW; } } else { break; } } }
 
 static CtInt lexBase16(CtLexer *self)
 {
@@ -218,10 +216,10 @@ static void lexDigit(CtLexer *self, CtToken *tok, int c)
 
     if (isIdent1(lexPeek(self)))
     {
-        StrBuffer buf = BUF_NEW(16);
-        BUF_PUSH(&buf, lexNext(self));
+        StrBuffer buf = bufNew(16);
+        bufPush(&buf, lexNext(self));
         while (isIdent2(lexPeek(self)))
-            BUF_PUSH(&buf, lexNext(self));
+            bufPush(&buf, lexNext(self));
 
         digit.suffix = buf.ptr;
     }
@@ -246,13 +244,11 @@ static struct CtKeyEntry key_table[] = {
 
 static void lexIdent(CtLexer *self, CtToken *tok, int c)
 {
-    StrBuffer buf = BUF_NEW(16);
-
-    if (c)
-        BUF_PUSH(&buf, c);
+    StrBuffer buf = bufNew(16);
+    bufPush(&buf, c);
 
     while (isIdent2(lexPeek(self)))
-        BUF_PUSH(&buf, lexNext(self));
+        bufPush(&buf, lexNext(self));
 
     for (CtSize i = 0; i < KEY_TABLE_SIZE; i++)
     {
@@ -303,7 +299,7 @@ static char lexEscapeChar(CtLexer *self)
     case '\'': return '\'';
     case '"': return '"';
     default:
-        /* error */
+        self->err = ERR_INVALID_ESCAPE;
         return c;
     }
 }
@@ -314,8 +310,12 @@ static CharResult lexSingleChar(CtLexer *self, char *out)
 
     switch (c)
     {
-    case '\n': return CR_NL;
-    case -1: return CR_END;
+    case '\n':
+        *out = '\n';
+        return CR_NL;
+    case -1:
+        self->err = ERR_EOF;
+        return CR_END;
     case '"': return CR_END;
     case '\\':
         *out = lexEscapeChar(self);
@@ -328,29 +328,27 @@ static CharResult lexSingleChar(CtLexer *self, char *out)
 
 static void lexMultiString(CtLexer *self, CtToken *tok)
 {
-    StrBuffer buf = BUF_NEW(64);
+    StrBuffer buf = bufNew(64);
 
     while (1)
     {
         char c;
         CharResult res = lexSingleChar(self, &c);
 
-        if (res == CR_END)
+        if (res != CR_CONTINUE && res != CR_NL)
             break;
 
-        /* TODO: handle error */
-
-        BUF_PUSH(&buf, c);
+        bufPush(&buf, c);
     }
 
     tok->kind = TK_STRING;
-    tok->data.str.len = buf.len;
+    tok->data.str.len = buf.len | CT_MULTILINE_FLAG;
     tok->data.str.str = buf.ptr;
 }
 
 static void lexSingleString(CtLexer *self, CtToken *tok)
 {
-    StrBuffer buf = BUF_NEW(32);
+    StrBuffer buf = bufNew(32);
 
     while (1)
     {
@@ -360,9 +358,10 @@ static void lexSingleString(CtLexer *self, CtToken *tok)
         if (res == CR_END)
             break;
 
-        /* TODO: handle error */
+        if (res == CR_NL)
+            self->err = ERR_NEWLINE;
 
-        BUF_PUSH(&buf, c);
+        bufPush(&buf, c);
     }
 
     tok->kind = TK_STRING;
@@ -375,13 +374,10 @@ static void lexChar(CtLexer *self, CtToken *tok)
     tok->kind = TK_CHAR;
     char c;
 
-    CharResult res = lexSingleChar(self, &c);
+    lexSingleChar(self, &c);
 
     if (lexNext(self) != '\'')
-    {
-        (void)res;
-        /* error */
-    }
+        self->err = ERR_UNTERMINATED;
 
     tok->data.letter = c;
 }
@@ -476,7 +472,7 @@ static void lexSymbol(CtLexer *self, CtToken *tok, int c)
     OP_CASE('}', K_RBRACE)
     OP_CASE2(':', ':', K_COLON2, K_COLON)
     default:
-        /* error */
+        self->err = ERR_INVALID_SYMBOL;
         break;
     }
 }
@@ -500,17 +496,17 @@ void ctResetKeys(CtLexer *self)
     self->nkeys = 0;
 }
 
-CtLexer ctLexerNew(void *data, CtLexerNextFunc next, CtAllocator alloc)
+CtLexer ctLexerNew(void *stream, CtLexerNextFunc next, void *udata)
 {
     CtLexer self = {
-        .alloc = alloc,
         .depth = 0,
         .nkeys = 0,
         .ukeys = NULL,
         .next = next,
-        .data = data,
-        .ahead = next(data),
-        .len = 0
+        .stream = stream,
+        .ahead = next(stream),
+        .len = 0,
+        .udata = udata
     };
 
     CtPosition pos = {
@@ -540,6 +536,7 @@ CtToken ctLexerNext(CtLexer *self)
     int c = lexSkip(self);
 
     self->len = 0;
+    self->err = ERR_NONE;
 
     tok.pos = self->pos;
 
@@ -585,22 +582,27 @@ CtToken ctLexerNext(CtLexer *self)
     /* add 1 here to account for lookahead token */
     tok.len = self->len + 1;
 
+    if (self->err != ERR_NONE)
+    {
+        CT_ERROR(self->udata, self->err);
+        self->err = ERR_NONE;
+    }
+
     return tok;
 }
 
-void ctFreeToken(CtToken tok, CtAllocator alloc)
+void ctFreeToken(CtToken tok)
 {
     switch (tok.kind)
     {
     case TK_IDENT:
-        alloc.dealloc(alloc.data, tok.data.ident);
+        CT_FREE(tok.data.ident);
         break;
     case TK_STRING:
-        alloc.dealloc(alloc.data, tok.data.str.str);
+        CT_FREE(tok.data.str.str);
         break;
     case TK_INT:
-        if (tok.data.num.suffix)
-            alloc.dealloc(alloc.data, tok.data.num.suffix);
+        CT_FREE(tok.data.num.suffix);
         break;
     default:
         break;
