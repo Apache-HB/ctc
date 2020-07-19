@@ -6,29 +6,6 @@
 #define CT_MALLOC malloc
 #define CT_FREE free
 
-typedef struct {
-    int err;
-} ExtraData;
-
-static void reportError(void *data, CtError err)
-{
-    ((ExtraData*)data)->err = 1;
-    switch (err)
-    {
-    case ERR_EOF:
-        printf("ERR EOF\n");
-        break;
-    case ERR_OVERFLOW:
-        printf("ERR OVERFLOW\n");
-        break;
-    default:
-        printf("ERR SOMETHING LOL\n");
-        break;
-    }
-}
-
-#define CT_ERROR(data, error) reportError(data, error)
-
 #include "cthulhu/cthulhu.c"
 
 static int posixGet(void *ptr) { return fgetc(ptr); }
@@ -139,10 +116,7 @@ int main(int argc, const char **argv)
     (void)argc;
     (void)argv;
 
-    ExtraData data;
-    data.err = 0;
-
-    CtLexer lex = ctLexerNew(stdin, posixGet, &data);
+    CtLexer lex = ctLexerNew(stdin, posixGet);
 
     while (1)
     {
@@ -152,7 +126,7 @@ int main(int argc, const char **argv)
 
         ctFreeToken(tok);
 
-        if (tok.kind == TK_EOF || data.err)
+        if (tok.kind == TK_EOF || tok.kind == TK_ERROR)
             break;
     }
 }

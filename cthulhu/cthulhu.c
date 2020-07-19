@@ -4,10 +4,6 @@
 #   error "CT_MALLOC and CT_FREE must be defined"
 #endif
 
-#ifndef CT_ERROR
-#   error "CT_ERROR must be defined"
-#endif
-
 /**
  * utils
  */
@@ -481,6 +477,65 @@ static void lexSymbol(CtLexer *self, CtToken *tok, int c)
 #undef OP_CASE2
 
 /**
+ * parser internals
+ */
+
+static CtToken parseNext(CtParser *self)
+{
+    CtToken tok = self->tok;
+
+    self->tok.kind = TK_LOOKAHEAD;
+
+    if (tok.kind == TK_LOOKAHEAD)
+    {
+        tok = ctLexerNext(&self->lex);
+    }
+
+    return tok;
+}
+
+static CtToken parsePeek(CtParser *self)
+{
+    CtToken tok = parseNext(self);
+    self->tok = tok;
+    return tok;
+}
+
+typedef enum {
+    OP_ERROR = 0,
+
+    OP_ASSIGN = 1,
+    OP_TERNARY = 2,
+    OP_COMPARE = 3,
+    OP_EQUAL = 4,
+    OP_LOGIC = 5,
+    OP_BITS = 6,
+    OP_SHIFT = 7,
+    OP_ADD = 8,
+    OP_MUL = 9
+} CtOpPrec;
+
+static CtOpPrec binopPrec(CtKey key)
+{
+    
+}
+
+static CtNode *parsePrimary(CtParser *self)
+{
+
+}
+
+static CtNode *parseBinary(CtParser *self, CtNode *lhs, CtOpPrec minprec)
+{
+
+}
+
+static CtNode *parseExpr(CtParser *self)
+{
+    return parseBinary(self, parsePrimary(self), OP_ASSIGN);
+}
+
+/**
  * public api
  */
 
@@ -496,7 +551,7 @@ void ctResetKeys(CtLexer *self)
     self->nkeys = 0;
 }
 
-CtLexer ctLexerNew(void *stream, CtLexerNextFunc next, void *udata)
+CtLexer ctLexerNew(void *stream, CtLexerNextFunc next)
 {
     CtLexer self = {
         .depth = 0,
@@ -505,8 +560,7 @@ CtLexer ctLexerNew(void *stream, CtLexerNextFunc next, void *udata)
         .next = next,
         .stream = stream,
         .ahead = next(stream),
-        .len = 0,
-        .udata = udata
+        .len = 0
     };
 
     CtPosition pos = {
@@ -584,7 +638,10 @@ CtToken ctLexerNext(CtLexer *self)
 
     if (self->err != ERR_NONE)
     {
-        CT_ERROR(self->udata, self->err);
+        ctFreeToken(tok);
+
+        tok.kind = TK_ERROR;
+        tok.data.err = self->err;
         self->err = ERR_NONE;
     }
 
@@ -607,4 +664,26 @@ void ctFreeToken(CtToken tok)
     default:
         break;
     }
+}
+
+CtParser ctParserNew(CtLexer lex)
+{
+    CtParser parse = {
+        .lex = lex,
+        .err = ERR_NONE
+    };
+    
+    parse.tok.kind = TK_LOOKAHEAD;
+
+    return parse;
+}
+
+CtNode *ctParseUnit(CtParser *self)
+{
+
+}
+
+CtNode *ctParseEval(CtParser *self)
+{
+
 }

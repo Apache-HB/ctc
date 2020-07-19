@@ -16,6 +16,31 @@ typedef struct {
     CtSize col;
 } CtPosition;
 
+
+typedef enum {
+    /* no error */
+    ERR_NONE,
+    /* integer overflow */
+    ERR_OVERFLOW,
+    /* bad escape sequence in string/char literal */
+    ERR_INVALID_ESCAPE,
+
+    /* EOF inside a string/char literal */
+    ERR_EOF,
+
+    /* newline inside a single line string/char literal */
+    ERR_NEWLINE,
+
+    /* missing trailing ' in a char literal */
+    ERR_UNTERMINATED,
+
+    /* invalid symbol while lexing */
+    ERR_INVALID_SYMBOL,
+
+    /* unexpected token encountered when parsing */
+    ERR_UNEXPECTED
+} CtError;
+
 typedef enum {
     TK_IDENT,
     TK_KEYWORD,
@@ -24,6 +49,7 @@ typedef enum {
     TK_CHAR,
     TK_INT,
     TK_EOF,
+    TK_ERROR,
 
     /* used internally by the parser */
     TK_LOOKAHEAD
@@ -78,6 +104,9 @@ typedef union {
     /* TK_INT */
     CtDigit num;
 
+    /* TK_ERROR */
+    CtError err;
+
     /* TK_EOF, TK_LOOKAHEAD */
 } CtTokenData;
 
@@ -96,27 +125,6 @@ typedef struct {
     const char *str;
     CtUserKey id;
 } CtUserKeyword;
-
-typedef enum {
-    /* no error */
-    ERR_NONE,
-    /* integer overflow */
-    ERR_OVERFLOW,
-    /* bad escape sequence in string/char literal */
-    ERR_INVALID_ESCAPE,
-
-    /* EOF inside a string/char literal */
-    ERR_EOF,
-
-    /* newline inside a single line string/char literal */
-    ERR_NEWLINE,
-
-    /* missing trailing ' in a char literal */
-    ERR_UNTERMINATED,
-
-    /* invalid symbol while lexing */
-    ERR_INVALID_SYMBOL
-} CtError;
 
 typedef struct {
     /* stream state */
@@ -137,19 +145,82 @@ typedef struct {
     int depth;
 
     CtError err;
-    void *udata;
 } CtLexer;
 
 void ctSetKeys(CtLexer *self, const CtUserKeyword *keys, CtSize num);
 void ctResetKeys(CtLexer *self);
 
-CtLexer ctLexerNew(void *stream, CtLexerNextFunc next, void *udata);
+CtLexer ctLexerNew(void *stream, CtLexerNextFunc next);
 
 CtToken ctLexerNext(CtLexer *self);
 void ctFreeToken(CtToken tok);
 
 typedef struct {
     CtLexer lex;
+
+    /* lookahead token */
+    CtToken tok;
+
+    CtError err;
 } CtParser;
+
+typedef enum {
+    NT_IDENT,
+    NT_ERROR,
+
+    NT_LITERAL,
+    NT_UNARY,
+    NT_BINARY,
+    NT_TERNARY
+} CtNodeType;
+
+typedef struct {
+    CtKey op;
+    struct CtNode *expr;
+} CtUnary;
+
+typedef struct {
+    CtKey op;
+    struct CtNode *lhs;
+    struct CtNode *rhs;
+} CtBinary;
+
+typedef struct {
+    /* cond ? yes : no; */
+    /* cond ?: no; yes = cond */
+    struct CtNode *cond;
+    struct CtNode *yes;
+    struct CtNode *no;
+} CtTernary;
+
+typedef union {
+    /* NT_IDENT */
+    char *ident;
+
+    /* NT_ERROR */
+    CtError err;
+
+    /* NT_LITERAL */
+    CtToken literal;
+
+    /* NT_UNARY */
+    CtUnary unary;
+
+    /* NT_BINARY */
+    CtBinary binary;
+
+    /* NT_TERNARY */
+    CtTernary ternary;
+} CtNodeData;
+
+typedef struct CtNode {
+    CtNodeType type;
+    CtToken tok;
+    CtNodeData data;
+} CtNode;
+
+CtParser ctParserNew(CtLexer lex);
+CtNode *ctParseUnit(CtParser *self);
+CtNode *ctParseEval(CtParser *self);
 
 #endif /* CTHULHU_H */
