@@ -161,6 +161,8 @@ typedef struct {
     /* lookahead token */
     CtToken tok;
 
+    /* error data */
+    CtToken errt;
     CtError err;
 } CtParser;
 
@@ -172,14 +174,6 @@ typedef enum {
     NT_UNARY,
     NT_BINARY,
     NT_TERNARY,
-
-    NT_REF,
-    NT_PTR,
-    NT_ARR,
-    NT_QUAL,
-    NT_CLOSURE,
-    NT_QUAL_ARG,
-    NT_TYPE
 } CtNodeType;
 
 typedef struct {
@@ -231,5 +225,7 @@ CtParser ctParserNew(CtLexer lex);
 
 CtNode *ctParseUnit(CtParser *self);
 CtNode *ctParseEval(CtParser *self);
+
+void ctFreeNode(CtNode *node);
 
 #endif /* CTHULHU_H */

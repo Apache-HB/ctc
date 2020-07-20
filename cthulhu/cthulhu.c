@@ -511,6 +511,7 @@ static int parseConsumeKey(CtParser *self, CtKey key)
 
     if (tok.kind == TK_KEYWORD && tok.data.key == key)
     {
+        ctFreeToken(tok);
         return 1;
     }
 
@@ -524,6 +525,7 @@ static void parseExpect(CtParser *self, CtKey key)
 
     if (tok.kind != TK_KEYWORD || tok.data.key != key)
     {
+        self->errt = tok;
         self->err = ERR_UNEXPECTED;
     }
 }
@@ -600,18 +602,23 @@ static CtOpPrec binopPrec(CtToken key)
 
 static CtNode *parseUnary(CtParser *self)
 {
-    CtToken tok = parseNext(self);
+    CtToken tok = parsePeek(self);
     CtNode *node;
     if (tok.data.key == K_LPAREN)
     {
+        parseNext(self);
         node = parseExpr(self);
         parseExpect(self, K_RPAREN);
     }
-    else
+    else if (VALID_UNARY(tok.data.key))
     {
         node = nodeFrom(NT_UNARY, tok);
         node->data.unary.op = tok.data.key;
         node->data.unary.expr = parsePrimary(self);
+    }
+    else
+    {
+        node = NULL;
     }
 
     return node;
@@ -625,7 +632,7 @@ static CtNode *parsePrimary(CtParser *self)
     switch (tok.kind)
     {
     case TK_KEYWORD:
-        node = VALID_UNARY(tok.data.key) ? parseUnary(self) : NULL;
+        node = parseUnary(self);
         break;
     case TK_IDENT:
         node = parseType(self);
@@ -682,7 +689,7 @@ static CtNode *parseBinary(CtParser *self, CtNode *lhs, CtOpPrec minprec)
         }
         else
         {
-            node->data.ternary.yes = parsePrimary(self);
+            node->data.ternary.yes = parseExpr(self);
             parseExpect(self, K_COLON);
         }
 
@@ -859,10 +866,21 @@ CtParser ctParserNew(CtLexer lex)
 
 CtNode *ctParseUnit(CtParser *self)
 {
-
+    (void)self;
+    return NULL;
 }
 
 CtNode *ctParseEval(CtParser *self)
 {
+    CtNode *node = parseExpr(self);
 
+    if (self->err != ERR_NONE)
+    {
+        ctFreeNode(node);
+        node = nodeFrom(NT_ERROR, self->errt);
+        node->data.err = self->err;
+        self->err = ERR_NONE;
+    }
+    
+    return node;
 }

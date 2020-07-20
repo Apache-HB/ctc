@@ -43,7 +43,7 @@ static void printInt(CtDigit num)
         printf("%s", num.suffix);
     }
 
-    printf(")\n");
+    printf(")");
 }
 
 static void printChar(char c)
@@ -73,13 +73,13 @@ static void printString(CtString str)
     for (CtSize i = 0; i < CT_STRLEN(str); i++)
         printChar(str.str[i]);
 
-    printf("\")\n");
+    printf("\")");
 }
 
 static void printUKey(CtUserKey key)
 {
     (void)key;
-    printf("UKEY()\n");
+    printf("UKEY()");
 }
 
 static void printToken(CtToken tok)
@@ -88,13 +88,13 @@ static void printToken(CtToken tok)
     switch (tok.kind)
     {
     case TK_CHAR:
-        printf("CHAR('%c')\n", (char)tok.data.letter);
+        printf("CHAR('%c')", (char)tok.data.letter);
         break;
     case TK_KEYWORD:
-        printf("KEYWORD(%s)\n", keyString(tok.data.key));
+        printf("KEYWORD(%s)", keyString(tok.data.key));
         break;
     case TK_IDENT:
-        printf("IDENT(%s)\n", tok.data.ident);
+        printf("IDENT(%s)", tok.data.ident);
         break;
     case TK_INT:
         printInt(tok.data.num);
@@ -106,27 +106,118 @@ static void printToken(CtToken tok)
         printUKey(tok.data.ukey);
         break;
     default:
-        printf("`INVALID`\n");
+        printf("`INVALID`");
         break;
     }
+
+    printf("\n");
+}
+
+#define KIND(kind) if (node && node->type != kind) { printf("invalid kind\n"); exit(1); }
+
+static void printExpr(CtNode *node);
+
+static void printBinary(CtNode *node)
+{
+    KIND(NT_BINARY)
+    printf("(");
+    printExpr(node->data.binary.lhs);
+    printf(" %s ", keyString(node->data.binary.op));
+    printExpr(node->data.binary.rhs);
+    printf(")");
+}
+
+static void printTernary(CtNode *node)
+{
+    KIND(NT_TERNARY)
+    printf("(");
+    printExpr(node->data.ternary.cond);
+    printf(" ? ");
+    printExpr(node->data.ternary.yes);
+    printf(" : ");
+    printExpr(node->data.ternary.no);
+    printf(")");
+}
+
+static void printUnary(CtNode *node)
+{
+    KIND(NT_UNARY)
+    printf("(%s", keyString(node->data.unary.op));
+    printExpr(node->data.unary.expr);
+    printf(")");
+}
+
+static void printLiteral(CtNode *node)
+{
+    KIND(NT_LITERAL)
+    switch (node->tok.kind)
+    {
+    case TK_STRING:
+        printString(node->tok.data.str);
+        break;
+    case TK_CHAR:
+        printChar(node->tok.data.letter);
+        break;
+    case TK_INT:
+        printInt(node->tok.data.num);
+        break;
+    default:
+        printf("invalid literal");
+        exit(1);
+    }
+}
+
+static void printExpr(CtNode *node)
+{
+    switch (node->type)
+    {
+    case NT_BINARY: printBinary(node); break;
+    case NT_TERNARY: printTernary(node); break;
+    case NT_UNARY: printUnary(node); break;
+    case NT_LITERAL: printLiteral(node); break;
+    default:
+        printf("invalid expr\n");
+        exit(1);
+    }
+}
+
+typedef struct {
+    const char *str;
+    int idx;
+} StringStream;
+
+int sstreamNext(void* ptr) 
+{
+    StringStream* self = (StringStream*)ptr;
+    int c = self->str[self->idx++];
+    if (!c)
+        return -1;
+
+    return c;
 }
 
 int main(int argc, const char **argv)
 {
-    (void)argc;
-    (void)argv;
+    (void)printToken;
 
-    CtLexer lex = ctLexerNew(stdin, posixGet);
+    StringStream sstream;
+    CtLexer lex;
 
-    while (1)
+    if (argc == 2)
     {
-        CtToken tok = ctLexerNext(&lex);
-
-        printToken(tok);
-
-        ctFreeToken(tok);
-
-        if (tok.kind == TK_EOF || tok.kind == TK_ERROR)
-            break;
+        sstream.str = argv[1];
+        sstream.idx = 0;
+        lex = ctLexerNew(&sstream, sstreamNext);
     }
+    else
+    {
+        lex = ctLexerNew(stdin, posixGet);
+    }
+
+    CtParser parse = ctParserNew(lex);
+
+
+    CtNode *node = ctParseEval(&parse);
+    
+    printf("\n%p\n", (void*)node);
 }
