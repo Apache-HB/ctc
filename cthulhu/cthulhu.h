@@ -171,7 +171,15 @@ typedef enum {
     NT_LITERAL,
     NT_UNARY,
     NT_BINARY,
-    NT_TERNARY
+    NT_TERNARY,
+
+    NT_REF,
+    NT_PTR,
+    NT_ARR,
+    NT_QUAL,
+    NT_CLOSURE,
+    NT_QUAL_ARG,
+    NT_TYPE
 } CtNodeType;
 
 typedef struct {
@@ -220,6 +228,7 @@ typedef struct CtNode {
 } CtNode;
 
 CtParser ctParserNew(CtLexer lex);
+
 CtNode *ctParseUnit(CtParser *self);
 CtNode *ctParseEval(CtParser *self);
 

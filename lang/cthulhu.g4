@@ -46,7 +46,8 @@ parameters : '(' parameterBody? ')' ;
 result : '->' type ;
 
 functionBody : SEMI | '=' expr SEMI | stmts ;
-function : attribs* 'def' Ident parameters? result? functionBody ;
+captures : ':' '[' ('=' | '&' | expr (',' expr)*) ']' ;
+function : attribs* 'def' Ident? parameters? captures? result? functionBody ;
 
 type : attribs* (ptr | ref | quals | array | signature) ;
 
@@ -88,7 +89,7 @@ primary
     : IntLiteral
     | StringLiteral
     | CharLiteral
-    | closure
+    | function
     | coerce
     | quals init?
     | init
@@ -104,12 +105,6 @@ callArgs : arg (',' arg)* ;
 call : '(' callArgs? ')' ;
 
 coerce : 'coerce' '!<' type '>' '(' expr ')' ;
-
-cparam : Ident (':' type)? ;
-cparams : '(' (cparam (',' cparam)*)? ')' ;
-lambda : '=>' expr | stmts ;
-closure : 'def' cparams? result? lambda;
-
 
 stmt : stmts | expr | var | return | alias | for | while | if | branch | builtin | 'break' SEMI | 'continue' SEMI | SEMI ;
 

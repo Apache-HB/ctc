@@ -480,6 +480,10 @@ static void lexSymbol(CtLexer *self, CtToken *tok, int c)
  * parser internals
  */
 
+static CtNode *parseExpr(CtParser *self);
+static CtNode *parsePrimary(CtParser *self);
+static CtNode *parseType(CtParser* self);
+
 static CtToken parseNext(CtParser *self)
 {
     CtToken tok = self->tok;
@@ -501,33 +505,208 @@ static CtToken parsePeek(CtParser *self)
     return tok;
 }
 
+static int parseConsumeKey(CtParser *self, CtKey key)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind == TK_KEYWORD && tok.data.key == key)
+    {
+        return 1;
+    }
+
+    self->tok = tok;
+    return 0;
+}
+
+static void parseExpect(CtParser *self, CtKey key)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind != TK_KEYWORD || tok.data.key != key)
+    {
+        self->err = ERR_UNEXPECTED;
+    }
+}
+
+static CtNode *nodeNew(CtNodeType type)
+{
+    CtNode *node = CT_MALLOC(sizeof(CtNode));
+    node->type = type;
+    return node;
+}
+
+static CtNode *nodeFrom(CtNodeType type, CtToken tok)
+{
+    CtNode *node = nodeNew(type);
+    node->tok = tok;
+    return node;
+}
+
+static CtNode *parseType(CtParser *self)
+{
+    (void)self;
+    return NULL;
+}
+
 typedef enum {
     OP_ERROR = 0,
 
     OP_ASSIGN = 1,
     OP_TERNARY = 2,
-    OP_COMPARE = 3,
+    OP_LOGIC = 3,
     OP_EQUAL = 4,
-    OP_LOGIC = 5,
+    OP_COMPARE = 5,
     OP_BITS = 6,
     OP_SHIFT = 7,
     OP_ADD = 8,
     OP_MUL = 9
 } CtOpPrec;
 
-static CtOpPrec binopPrec(CtKey key)
+static CtOpPrec binopPrec(CtToken key)
 {
-    
+    if (key.kind != TK_KEYWORD)
+        return TK_ERROR;
+
+    switch (key.data.key)
+    {
+    case K_ASSIGN: case K_ADDEQ: case K_SUBEQ:
+    case K_MULEQ: case K_DIVEQ: case K_MODEQ:
+    case K_SHLEQ: case K_SHREQ: case K_XOREQ:
+    case K_BITANDEQ: case K_BITOREQ:
+        return OP_ASSIGN;
+    case K_QUESTION:
+        return OP_TERNARY;
+    case K_AND: case K_OR:
+        return OP_LOGIC;
+    case K_EQ: case K_NEQ:
+        return OP_EQUAL;
+    case K_GT: case K_GTE: case K_LT: case K_LTE:
+        return OP_COMPARE;
+    case K_XOR: case K_BITAND: case K_BITOR:
+        return OP_BITS;
+    case K_SHL: case K_SHR:
+        return OP_SHIFT;
+    case K_ADD: case K_SUB:
+        return OP_ADD;
+    case K_MUL: case K_DIV: case K_MOD:
+        return OP_MUL;
+
+    default:
+        return OP_ERROR;
+    }
+}
+
+#define VALID_UNARY(expr) ((expr) == K_ADD || (expr) == K_SUB || (expr) == K_NOT || (expr) == K_AND || (expr) == K_MUL)
+
+static CtNode *parseUnary(CtParser *self)
+{
+    CtToken tok = parseNext(self);
+    CtNode *node;
+    if (tok.data.key == K_LPAREN)
+    {
+        node = parseExpr(self);
+        parseExpect(self, K_RPAREN);
+    }
+    else
+    {
+        node = nodeFrom(NT_UNARY, tok);
+        node->data.unary.op = tok.data.key;
+        node->data.unary.expr = parsePrimary(self);
+    }
+
+    return node;
 }
 
 static CtNode *parsePrimary(CtParser *self)
 {
+    CtToken tok = parsePeek(self);
+    CtNode *node;
 
+    switch (tok.kind)
+    {
+    case TK_KEYWORD:
+        node = VALID_UNARY(tok.data.key) ? parseUnary(self) : NULL;
+        break;
+    case TK_IDENT:
+        node = parseType(self);
+        break;
+    case TK_INT: case TK_STRING: case TK_CHAR:
+        node = nodeFrom(NT_LITERAL, parseNext(self));
+        break;
+    default:
+        node = NULL;
+        break;
+    }
+
+    if (!node)
+        return NULL;
+
+    while (1)
+    {
+        if (parseConsumeKey(self, K_LSQUARE))
+        {
+            //node = parseSubscript(self, K_LSQUARE);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return node;
+}
+
+static CtNode *makeBinary(CtNode *lhs, CtNode *rhs, CtToken tok)
+{
+    CtNode *node = nodeFrom(NT_BINARY, tok);
+    node->data.binary.op = tok.data.key;
+    node->data.binary.lhs = lhs;
+    node->data.binary.rhs = rhs;
+    return node;
 }
 
 static CtNode *parseBinary(CtParser *self, CtNode *lhs, CtOpPrec minprec)
 {
+    CtToken ahead = parsePeek(self);
 
+    if (binopPrec(ahead) == OP_TERNARY)
+    {
+        parseNext(self);
+
+        CtNode *node = nodeNew(NT_TERNARY);
+        node->data.ternary.cond = lhs;
+
+        if (parseConsumeKey(self, K_COLON))
+        {
+            node->data.ternary.yes = lhs;
+        }
+        else
+        {
+            node->data.ternary.yes = parsePrimary(self);
+            parseExpect(self, K_COLON);
+        }
+
+        node->data.ternary.no = parseExpr(self);
+
+        return node;
+    }
+
+    while (binopPrec(ahead) >= minprec)
+    {
+        CtToken op = parseNext(self);
+        CtNode *rhs = parsePrimary(self);
+        ahead = parsePeek(self);
+
+        while (binopPrec(ahead) >= binopPrec(op) && binopPrec(ahead) != OP_ERROR)
+        {
+            rhs = parseBinary(self, rhs, binopPrec(ahead));
+            ahead = parsePeek(self);
+        }
+
+        lhs = makeBinary(lhs, rhs, op);
+    }
+
+    return lhs;
 }
 
 static CtNode *parseExpr(CtParser *self)
@@ -672,7 +851,7 @@ CtParser ctParserNew(CtLexer lex)
         .lex = lex,
         .err = ERR_NONE
     };
-    
+
     parse.tok.kind = TK_LOOKAHEAD;
 
     return parse;
