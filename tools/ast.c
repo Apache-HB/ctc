@@ -181,28 +181,6 @@ static void printExpr(CtNode *node)
     }
 }
 
-
-
-typedef struct {
-    void *data;
-} CtObject;
-
-static CtObject *evalNode(CtNode *node)
-{
-    switch (node->type)
-    {
-    case NT_BINARY:
-    case NT_UNARY:
-    case NT_TERNARY:
-    case NT_LITERAL:
-
-    default:
-        break;
-    }
-
-    return NULL;
-}
-
 typedef struct {
     const char *str;
     int idx;
@@ -240,6 +218,5 @@ int main(int argc, const char **argv)
 
 
     CtNode *node = ctParseEval(&parse);
-
-    evalNode(node);
+    printExpr(node);
 }

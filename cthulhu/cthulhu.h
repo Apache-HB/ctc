@@ -174,7 +174,41 @@ typedef enum {
     NT_UNARY,
     NT_BINARY,
     NT_TERNARY,
+
+    NT_QUALS,
+    NT_QUAL,
+    NT_PTR,
+    NT_REF,
+    NT_ARR,
+    NT_CLOSURE,
+    NT_TPARAM
 } CtNodeType;
+
+typedef struct {
+    struct CtNode *data;
+    CtSize len;
+    CtSize alloc;
+} CtNodeArray;
+
+typedef struct {
+    struct CtNode *name;
+    CtNodeArray params;
+} CtQual;
+
+typedef struct {
+    struct CtNode *type;
+    struct CtNode *size;
+} CtArray;
+
+typedef struct {
+    CtNodeArray args;
+    struct CtNode *result;
+} CtClosure;
+
+typedef struct {
+    struct CtNode *name;
+    struct CtNode *type;
+} CtParam;
 
 typedef struct {
     CtKey op;
@@ -204,6 +238,24 @@ typedef union {
 
     /* NT_LITERAL */
     CtToken literal;
+
+    /* NT_TPARAM */
+    CtParam tparam;
+
+    /* NT_QUAL */
+    CtQual qual;
+
+    /* NT_QUALS */
+    CtNodeArray quals;
+
+    /* NT_REF, NT_PTR */
+    struct CtNode *type;
+
+    /* NT_ARR */
+    CtArray arr;
+
+    /* NT_CLOSURE */
+    CtClosure closure;
 
     /* NT_UNARY */
     CtUnary unary;

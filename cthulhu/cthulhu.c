@@ -544,10 +544,196 @@ static CtNode *nodeFrom(CtNodeType type, CtToken tok)
     return node;
 }
 
+static CtNodeArray arrNew(CtSize size)
+{
+    CtNodeArray arr = {
+        .data = CT_MALLOC(sizeof(CtNode) * size),
+        .len = 0,
+        .alloc = size
+    };
+
+    return arr;
+}
+
+static CtNodeArray emptyArr()
+{
+    CtNodeArray arr = {
+        .data = NULL,
+        .len = 0,
+        .alloc = 0
+    };
+
+    return arr;
+}
+
+static void arrAdd(CtNodeArray *self, CtNode *node)
+{
+    if (self->alloc >= self->len + 1)
+    {
+        self->alloc += 4;
+        CtNode *temp = CT_MALLOC(sizeof(CtNode) * self->alloc);
+        memCopy(temp, self->data, self->len * sizeof(CtNode));
+        CT_FREE(self->data);
+        self->data = temp;
+    }
+
+    self->data[self->len++] = *node;
+}
+
+/**
+ * parse an array of at least one item
+ * seperated by sep and terminated by end
+ */
+static CtNodeArray parseUntil(CtParser *self, CtNode*(*func)(CtParser*), CtKey sep, CtKey end)
+{
+    CtNodeArray arr = arrNew(4);
+
+    arrAdd(&arr, func(self));
+
+    while (!parseConsumeKey(self, end))
+    {
+        parseExpect(self, sep);
+        arrAdd(&arr, func(self));
+    }
+
+    return arr;
+}
+
+static CtNodeArray parseCollect(CtParser *self, CtNode*(*func)(CtParser*), CtKey sep)
+{
+    CtNodeArray arr = arrNew(4);
+
+    do { arrAdd(&arr, func(self)); } while (parseConsumeKey(self, sep));
+
+    return arr;
+}
+
+static CtNode *parseIdent(CtParser *self)
+{
+    CtToken tok = parseNext(self);
+
+    if (tok.kind != TK_IDENT)
+    {
+        self->err = ERR_UNEXPECTED;
+        self->errt = tok;
+        return NULL;
+    }
+    else
+    {
+        CtNode *node = nodeFrom(NT_IDENT, tok);
+        node->data.ident = tok.data.ident;
+        return node;
+    }
+}
+
+static CtNode *parseTParam(CtParser *self)
+{
+    CtNode *node = nodeNew(NT_TPARAM);
+
+    /* :Ident = type */
+    if (parseConsumeKey(self, K_COLON))
+    {
+        node->data.tparam.name = parseIdent(self);
+        parseExpect(self, K_ASSIGN);
+    }
+    else
+    {
+        /* type */
+        node->data.tparam.name = NULL;
+    }
+
+    node->data.tparam.type = parseType(self);
+
+    return node;
+}
+
+static CtNode *parseQualType(CtParser *self)
+{
+    CtNode *qual = nodeNew(NT_QUAL);
+    qual->data.qual.name = parseIdent(self);
+    qual->data.qual.params = parseConsumeKey(self, K_TBEGIN)
+        ? parseUntil(self, parseTParam, K_COMMA, K_TEND)
+        : emptyArr();
+
+    return qual;
+}
+
+static CtNode *parseQualTypes(CtParser *self)
+{
+    CtNode *node = nodeNew(NT_QUALS);
+    node->data.quals = parseCollect(self, parseQualType, K_COLON2);
+    return node;
+}
+
+static CtNode *parseArray(CtParser *self)
+{
+    CtNode *node = nodeNew(NT_ARR);
+    node->data.arr.type = parseType(self);
+    node->data.arr.size = parseConsumeKey(self, K_COLON)
+        ? parseExpr(self) : NULL;
+
+    parseExpect(self, K_RSQUARE);
+
+    return node;
+}
+
+static CtNode *parseClosure(CtParser *self)
+{
+    CtNodeArray args = parseConsumeKey(self, K_LPAREN)
+        ? parseUntil(self, parseType, K_COMMA, K_RPAREN)
+        : emptyArr();
+    CtNode *result = parseConsumeKey(self, K_ARROW)
+        ? parseType(self) : NULL;
+
+    CtNode *node = nodeNew(NT_CLOSURE);
+    node->data.closure.args = args;
+    node->data.closure.result = result;
+
+    return node;
+}
+
 static CtNode *parseType(CtParser *self)
 {
-    (void)self;
-    return NULL;
+    CtToken tok = parseNext(self);
+    CtNode *node = NULL;
+
+    if (tok.kind == TK_IDENT)
+    {
+        /* qualified typenames */
+
+        /* put the token back so parseQualTypes works properly */
+        self->tok = tok;
+        node = parseQualTypes(self);
+    }
+    else if (tok.kind == TK_KEYWORD)
+    {
+        switch (tok.data.key)
+        {
+        case K_MUL:
+            /* pointer */
+            node = nodeFrom(NT_PTR, tok);
+            node->data.type = parseType(self);
+            break;
+        case K_BITAND:
+            /* reference */
+            node = nodeFrom(NT_REF, tok);
+            node->data.type = parseType(self);
+            break;
+        case K_LSQUARE:
+            /* array */
+            node = parseArray(self);
+            break;
+        case K_DEF:
+            /* closure */
+            node = parseClosure(self);
+            break;
+        default:
+            /* error */
+            break;
+        }
+    }
+
+    return node;
 }
 
 typedef enum {
@@ -604,9 +790,10 @@ static CtNode *parseUnary(CtParser *self)
 {
     CtToken tok = parsePeek(self);
     CtNode *node;
+
     if (tok.data.key == K_LPAREN)
     {
-        parseNext(self);
+        ctFreeToken(parseNext(self));
         node = parseExpr(self);
         parseExpect(self, K_RPAREN);
     }
@@ -881,6 +1068,12 @@ CtNode *ctParseEval(CtParser *self)
         node->data.err = self->err;
         self->err = ERR_NONE;
     }
-    
+
     return node;
+}
+
+void ctFreeNode(CtNode *node)
+{
+    (void)node;
+    /* UHHHH */
 }
