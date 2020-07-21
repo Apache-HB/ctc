@@ -26,7 +26,7 @@ static void printInt(CtDigit num)
     switch (num.enc)
     {
     case DE_BASE10:
-        printf("INT(%ld", num.num);
+        printf("INT(%lu", num.num);
         break;
     case DE_BASE16:
         printf("HEX(0x%08lX", num.num);
@@ -219,4 +219,5 @@ int main(int argc, const char **argv)
 
     CtNode *node = ctParseEval(&parse);
     printExpr(node);
+    printf("\n");
 }

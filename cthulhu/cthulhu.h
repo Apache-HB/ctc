@@ -174,6 +174,10 @@ typedef enum {
     NT_UNARY,
     NT_BINARY,
     NT_TERNARY,
+    NT_NAME,
+    NT_DEREF,
+    NT_ACCESS,
+    NT_SUBSCRIPT,
 
     NT_QUALS,
     NT_QUAL,
@@ -183,6 +187,16 @@ typedef enum {
     NT_CLOSURE,
     NT_TPARAM
 } CtNodeType;
+
+typedef struct {
+    struct CtNode *expr;
+    struct CtNode *field;
+} CtAccess;
+
+typedef struct {
+    struct CtNode *expr;
+    struct CtNode *index;
+} CtSubscript;
 
 typedef struct {
     struct CtNode *data;
@@ -245,7 +259,13 @@ typedef union {
     /* NT_QUAL */
     CtQual qual;
 
-    /* NT_QUALS */
+    /* NT_DEREF, NT_ACCESS */
+    CtAccess access;
+
+    /* NT_SUBSCRIPT */
+    CtSubscript subscript;
+
+    /* NT_QUALS, NT_NAME */
     CtNodeArray quals;
 
     /* NT_REF, NT_PTR */

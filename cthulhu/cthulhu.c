@@ -153,13 +153,31 @@ static CtInt lexBase16(CtLexer *self)
     return out;
 }
 
+#define BASE10_LIMIT (18446744073709551615ULL % 10)
+#define BASE10_CUTOFF (18446744073709551615ULL / 10)
+
 static CtInt lexBase10(CtLexer *self, int c)
 {
     CtInt out = (CtInt)(c - '0');
 
-    LEX_COLLECT(22, c, isDigit(c), {
-        out = (out * 10) + ((uint8_t)c - '0');
-    })
+    while (1) 
+    { 
+        c = lexPeek(self); 
+        if (isDigit(c)) 
+        { 
+            CtInt n = (CtInt)(c - '0'); 
+            if (out > BASE10_CUTOFF || (out == BASE10_CUTOFF && n > BASE10_LIMIT)) 
+                self->err = ERR_OVERFLOW;
+                
+            out = (out * 10) + (c - '0');
+        }
+        else
+        {
+            break;
+        }
+        
+        lexNext(self);
+    }
 
     return out;
 }
@@ -823,6 +841,7 @@ static CtNode *parsePrimary(CtParser *self)
         break;
     case TK_IDENT:
         node = parseType(self);
+        node->type = NT_NAME;
         break;
     case TK_INT: case TK_STRING: case TK_CHAR:
         node = nodeFrom(NT_LITERAL, parseNext(self));
@@ -837,9 +856,26 @@ static CtNode *parsePrimary(CtParser *self)
 
     while (1)
     {
-        if (parseConsumeKey(self, K_LSQUARE))
+        if (parseConsumeKey(self, K_DOT))
         {
-            //node = parseSubscript(self, K_LSQUARE);
+            CtNode *access = nodeNew(NT_ACCESS);
+            access->data.access.expr = node;
+            access->data.access.field = parseIdent(self);
+            node = access;
+        }
+        else if (parseConsumeKey(self, K_ARROW))
+        {
+            CtNode *access = nodeNew(NT_DEREF);
+            access->data.access.expr = node;
+            access->data.access.field = parseIdent(self);
+            node = access;
+        }
+        else if (parseConsumeKey(self, K_LSQUARE))
+        {
+            CtNode *subscript = nodeNew(NT_SUBSCRIPT);
+            subscript->data.subscript.expr = node;
+            subscript->data.subscript.index = parseExpr(self);
+            node = subscript;
         }
         else
         {
