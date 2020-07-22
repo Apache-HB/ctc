@@ -181,21 +181,116 @@ static void printExpr(CtNode *node)
     }
 }
 
-
+typedef struct {
+    struct CtObject *val;
+    char *name;
+} CtStructField;
 
 typedef struct {
-    void *data;
+    /* fields */
+    CtStructField *fields;
+    int num;
+
+    /* the alignment of the struct */
+    int align;
+
+    /* the maximum packing */
+    int packing;
+
+    /* name of struct */
+    char *name;
+} CtStruct;
+
+typedef struct {
+    struct CtTypeInfo *type;
+    char *name;
+} CtUnionField;
+
+typedef struct {
+    /* fields */
+    CtUnionField *fields;
+    int num;
+
+    /* the currently set field index */
+    int selected;
+
+    /* name of union */
+    char *name;
+
+    /* the currently held value */
+    struct CtObject *val;
+} CtUnion;
+
+typedef struct {
+    enum {
+        TT_STRING,
+        TT_U8,
+        TT_U16,
+        TT_U32,
+        TT_U64,
+        TT_I8,
+        TT_I16,
+        TT_I32,
+        TT_I64,
+        TT_BOOL,
+        TT_REF,
+        TT_BOOL,
+        TT_STRUCT,
+        TT_UNION,
+        TT_PTR,
+        TT_REF,
+        TT_ARR,
+        TT_CLOSURE
+    } type;
+
+    /* is the data mutable, by default everything is immutable */
+    int mut;
+} CtTypeInfo;
+
+typedef struct CtObject {
+    CtTypeInfo type;
+
+    union {
+        char *str;
+        uint8_t _u8;
+        uint16_t _u16;
+        uint32_t _u32;
+        uint64_t _u64;
+        int8_t _i8;
+        int16_t _i16;
+        int32_t _i32;
+        int64_t _i64;
+        CtStruct struc;
+        CtUnion uni;
+        struct CtObject *ptr;
+        struct CtObject *ref;
+    } data;
 } CtObject;
+
+static CtTypeInfo *typeofObject(CtObject *object)
+{
+
+}
+
+static CtObject *makeObject(CtNode *node)
+{
+
+}
 
 static CtObject *evalNode(CtNode *node)
 {
     switch (node->type)
     {
+    case NT_ERROR:
+        return NULL;
     case NT_BINARY:
+        return evalBinary(node);
     case NT_UNARY:
+        return evalUnary(node);
     case NT_TERNARY:
+        return evalTernary(node);
     case NT_LITERAL:
-
+        return makeObject(node);
     default:
         break;
     }

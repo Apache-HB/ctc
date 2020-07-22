@@ -6,6 +6,8 @@
 #define CT_MALLOC malloc
 #define CT_FREE free
 
+static void printToken(CtToken tok);
+
 #include "cthulhu/cthulhu.c"
 
 static int posixGet(void *ptr) { return fgetc(ptr); }
@@ -169,6 +171,12 @@ static void printLiteral(CtNode *node)
 
 static void printExpr(CtNode *node)
 {
+    if (!node)
+    {
+        printf("PAIN");
+        return;
+    }
+
     switch (node->type)
     {
     case NT_BINARY: printBinary(node); break;
@@ -176,7 +184,6 @@ static void printExpr(CtNode *node)
     case NT_UNARY: printUnary(node); break;
     case NT_LITERAL: printLiteral(node); break;
     default:
-        printf("invalid expr\n");
         exit(1);
     }
 }

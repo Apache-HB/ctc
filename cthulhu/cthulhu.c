@@ -5,6 +5,101 @@
 #endif
 
 /**
+ * util functions
+ */
+
+CtBuffer bufferNew(CtSize size)
+{
+    CtBuffer buf;
+
+    buf.ptr = CT_MALLOC(size);
+    buf.ptr[0] = 0;
+    buf.len = 0;
+    buf.alloc = size;
+
+    return buf;
+}
+
+void bufferPush(CtBuffer *self, int c)
+{
+    if (self->alloc >= self->len)
+    {
+        char *temp = self->ptr;
+        self->alloc += 0x1000;
+        self->ptr = CT_MALLOC(self->alloc + 1);
+        memcpy(self->ptr, temp, self->len + 1);
+        CT_FREE(temp);
+    }
+
+    self->ptr[self->len++] = c;
+    self->ptr[self->len] = 0;
+}
+
+/**
+ * lexer internals
+ */
+
+static int lexNext(CtLexer *self)
+{
+    int c = self->ahead;
+    self->ahead = self->next(self->stream);
+
+    return c;
+}
+
+static int lexPeek(CtLexer *self)
+{
+    return self->ahead;
+}
+
+static int lexSkip(CtLexer *self)
+{
+    int c = lexNext(self);
+
+    while (1)
+    {
+        if (c == '#')
+        {
+            while (lexPeek(self) != '\n')
+                c = lexNext(self);
+
+            c = lexSkip(self);
+        }
+        else if (isSpace(c))
+        {
+            c = lexNext(self);
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    return c;
+}
+
+/**
+ * public API
+ */
+
+CtLexer ctlexerNew(void *stream, CtNextFunc next)
+{
+
+}
+
+void ctLexerDelete(CtLexer *self)
+{
+
+}
+
+CtToken ctLexerNext(CtLexer *self)
+{
+
+}
+
+#if 0
+
+/**
  * utils
  */
 
@@ -36,15 +131,9 @@ static int strEq(const char *lhs, const char *rhs)
  * lexer internals
  */
 
-typedef struct {
-    char *ptr;
-    CtSize len;
-    CtSize alloc;
-} StrBuffer;
-
-StrBuffer bufNew(CtSize size)
+CtStrBuffer bufNew(CtSize size)
 {
-    StrBuffer buf = {
+    CtStrBuffer buf = {
         .ptr = CT_MALLOC(size),
         .len = 0,
         .alloc = size
@@ -55,7 +144,7 @@ StrBuffer bufNew(CtSize size)
     return buf;
 }
 
-void bufPush(StrBuffer *buf, char c)
+void bufPush(CtStrBuffer *buf, char c)
 {
     char *temp;
 
@@ -72,10 +161,20 @@ void bufPush(StrBuffer *buf, char c)
     buf->ptr[buf->len] = '\0';
 }
 
+/**
+ * get the current offset in source
+ */
+const char *lexCur(CtLexer *self)
+{
+    return self->source.ptr + self->pos.dist;
+}
+
 static int lexNext(CtLexer *self)
 {
     int c = self->ahead;
     self->ahead = self->next(self->stream);
+
+    bufPush(&self->source, c);
 
     self->len++;
     self->pos.dist++;
@@ -160,22 +259,23 @@ static CtInt lexBase10(CtLexer *self, int c)
 {
     CtInt out = (CtInt)(c - '0');
 
-    while (1) 
-    { 
-        c = lexPeek(self); 
-        if (isDigit(c)) 
-        { 
-            CtInt n = (CtInt)(c - '0'); 
-            if (out > BASE10_CUTOFF || (out == BASE10_CUTOFF && n > BASE10_LIMIT)) 
+    /* we handle overflow differently here due to how base10 works */
+    while (1)
+    {
+        c = lexPeek(self);
+        if (isDigit(c))
+        {
+            CtInt n = (CtInt)(c - '0');
+            if (out > BASE10_CUTOFF || (out == BASE10_CUTOFF && n > BASE10_LIMIT))
                 self->err = ERR_OVERFLOW;
-                
+
             out = (out * 10) + (c - '0');
         }
         else
         {
             break;
         }
-        
+
         lexNext(self);
     }
 
@@ -230,16 +330,20 @@ static void lexDigit(CtLexer *self, CtToken *tok, int c)
 
     if (isIdent1(lexPeek(self)))
     {
-        StrBuffer buf = bufNew(16);
-        bufPush(&buf, lexNext(self));
+        const char *suffix = lexCur(self);
+        CtSize len = 1;
         while (isIdent2(lexPeek(self)))
-            bufPush(&buf, lexNext(self));
+        {
+            lexNext(self);
+            len++;
+        }
 
-        digit.suffix = buf.ptr;
+        digit.suffix.len = len;
+        digit.suffix.str = suffix;
     }
     else
     {
-        digit.suffix = NULL;
+        digit.suffix.len = 0;
     }
 
     tok->kind = TK_INT;
@@ -258,7 +362,7 @@ static struct CtKeyEntry key_table[] = {
 
 static void lexIdent(CtLexer *self, CtToken *tok, int c)
 {
-    StrBuffer buf = bufNew(16);
+    CtStrBuffer buf = bufNew(16);
     bufPush(&buf, c);
 
     while (isIdent2(lexPeek(self)))
@@ -342,7 +446,8 @@ static CharResult lexSingleChar(CtLexer *self, char *out)
 
 static void lexMultiString(CtLexer *self, CtToken *tok)
 {
-    StrBuffer buf = bufNew(64);
+    const char *str = self->source.ptr;
+    CtSize len = 0;
 
     while (1)
     {
@@ -352,17 +457,18 @@ static void lexMultiString(CtLexer *self, CtToken *tok)
         if (res != CR_CONTINUE && res != CR_NL)
             break;
 
-        bufPush(&buf, c);
+        len++;
     }
 
     tok->kind = TK_STRING;
-    tok->data.str.len = buf.len | CT_MULTILINE_FLAG;
-    tok->data.str.str = buf.ptr;
+    tok->data.str.len = len | CT_MULTILINE_FLAG;
+    tok->data.str.str = str;
 }
 
 static void lexSingleString(CtLexer *self, CtToken *tok)
 {
-    StrBuffer buf = bufNew(32);
+    const char *str = self->source.ptr;
+    CtSize len = 0;
 
     while (1)
     {
@@ -375,12 +481,12 @@ static void lexSingleString(CtLexer *self, CtToken *tok)
         if (res == CR_NL)
             self->err = ERR_NEWLINE;
 
-        bufPush(&buf, c);
+        len++;
     }
 
     tok->kind = TK_STRING;
-    tok->data.str.len = buf.len;
-    tok->data.str.str = buf.ptr;
+    tok->data.str.len = len;
+    tok->data.str.str = str;
 }
 
 static void lexChar(CtLexer *self, CtToken *tok)
@@ -513,6 +619,12 @@ static CtToken parseNext(CtParser *self)
         tok = ctLexerNext(&self->lex);
     }
 
+    if (tok.kind == TK_ERROR)
+    {
+        self->err = ERR_UNEXPECTED;
+        self->errt = tok;
+    }
+
     return tok;
 }
 
@@ -529,7 +641,6 @@ static int parseConsumeKey(CtParser *self, CtKey key)
 
     if (tok.kind == TK_KEYWORD && tok.data.key == key)
     {
-        ctFreeToken(tok);
         return 1;
     }
 
@@ -545,6 +656,12 @@ static void parseExpect(CtParser *self, CtKey key)
     {
         self->errt = tok;
         self->err = ERR_UNEXPECTED;
+
+        /* if we get a bad keyword, set the error then consume the rest of the statement */
+        do tok = parseNext(self); while (tok.kind != TK_KEYWORD || tok.data.key != K_SEMI);
+
+        /* clear the template depth */
+        self->lex.depth = 0;
     }
 }
 
@@ -811,13 +928,12 @@ static CtNode *parseUnary(CtParser *self)
 
     if (tok.data.key == K_LPAREN)
     {
-        ctFreeToken(parseNext(self));
         node = parseExpr(self);
         parseExpect(self, K_RPAREN);
     }
     else if (VALID_UNARY(tok.data.key))
     {
-        node = nodeFrom(NT_UNARY, tok);
+        node = nodeFrom(NT_UNARY, parseNext(self));
         node->data.unary.op = tok.data.key;
         node->data.unary.expr = parsePrimary(self);
     }
@@ -847,6 +963,8 @@ static CtNode *parsePrimary(CtParser *self)
         node = nodeFrom(NT_LITERAL, parseNext(self));
         break;
     default:
+        self->err = ERR_UNEXPECTED;
+        self->errt = tok;
         node = NULL;
         break;
     }
@@ -969,7 +1087,8 @@ CtLexer ctLexerNew(void *stream, CtLexerNextFunc next)
         .next = next,
         .stream = stream,
         .ahead = next(stream),
-        .len = 0
+        .len = 0,
+        .source = bufNew(1024)
     };
 
     CtPosition pos = {
@@ -1002,6 +1121,9 @@ CtToken ctLexerNext(CtLexer *self)
     self->err = ERR_NONE;
 
     tok.pos = self->pos;
+
+    if (tok.pos.col > 2)
+        tok.pos.col -= 2;
 
     if (c == -1)
     {
@@ -1047,8 +1169,6 @@ CtToken ctLexerNext(CtLexer *self)
 
     if (self->err != ERR_NONE)
     {
-        ctFreeToken(tok);
-
         tok.kind = TK_ERROR;
         tok.data.err = self->err;
         self->err = ERR_NONE;
@@ -1057,22 +1177,9 @@ CtToken ctLexerNext(CtLexer *self)
     return tok;
 }
 
-void ctFreeToken(CtToken tok)
+void ctLexerFree(CtLexer *self)
 {
-    switch (tok.kind)
-    {
-    case TK_IDENT:
-        CT_FREE(tok.data.ident);
-        break;
-    case TK_STRING:
-        CT_FREE(tok.data.str.str);
-        break;
-    case TK_INT:
-        CT_FREE(tok.data.num.suffix);
-        break;
-    default:
-        break;
-    }
+    CT_FREE(self->source.ptr);
 }
 
 CtParser ctParserNew(CtLexer lex)
@@ -1113,3 +1220,5 @@ void ctFreeNode(CtNode *node)
     (void)node;
     /* UHHHH */
 }
+
+#endif
