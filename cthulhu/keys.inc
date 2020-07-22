@@ -100,5 +100,9 @@ OP(K_RSQUARE, "]")
 OP(K_LBRACE, "{")
 OP(K_RBRACE, "}")
 
+/* unused operators */
+OP(K_DOLLAR, "$")
+OP(K_BACKTICK, "`")
+
 #undef KEY
 #undef OP

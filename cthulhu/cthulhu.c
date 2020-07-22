@@ -4,6 +4,9 @@
 #   error "CT_MALLOC and CT_FREE must be defined"
 #endif
 
+#include <string.h>
+#include <ctype.h>
+
 /**
  * util functions
  */
@@ -44,12 +47,36 @@ static int lexNext(CtLexer *self)
     int c = self->ahead;
     self->ahead = self->next(self->stream);
 
+    self->len++;
+    self->pos.dist++;
+
+    if (c == '\n')
+    {
+        self->pos.col = 0;
+        self->pos.line++;
+    }
+    else
+    {
+        self->pos.col++;
+    }
+
     return c;
 }
 
 static int lexPeek(CtLexer *self)
 {
     return self->ahead;
+}
+
+static int lexConsume(CtLexer *self, int c)
+{
+    if (lexPeek(self) == c)
+    {
+        lexNext(self);
+        return 1;
+    }
+
+    return 0;
 }
 
 static int lexSkip(CtLexer *self)
@@ -65,7 +92,7 @@ static int lexSkip(CtLexer *self)
 
             c = lexSkip(self);
         }
-        else if (isSpace(c))
+        else if (isspace(c))
         {
             c = lexNext(self);
         }
@@ -78,23 +105,80 @@ static int lexSkip(CtLexer *self)
     return c;
 }
 
+static void lexIdent(CtLexer *self, CtToken *tok, int c)
+{
+
+}
+
+static void lexMultiString(CtLexer *self, CtToken *tok)
+{
+
+}
+
+static void lexSingleString(CtLexer *self, CtToken *tok)
+{
+    
+}
+
 /**
  * public API
  */
 
 CtLexer ctlexerNew(void *stream, CtNextFunc next)
 {
+    CtLexer self;
 
+    self.stream = stream;
+    self.next = next;
+    self.ahead = next(stream);
+
+    self.pos.dist = 0;
+    self.pos.col = 0;
+    self.pos.line = 0;
+
+    /* setup out buffers */
+    self.strings = bufferNew(0x1000);
+    self.source = bufferNew(0x1000);
+    bufferPush(&self.source, self.ahead);
+
+    return self;
 }
 
 void ctLexerDelete(CtLexer *self)
 {
-
+    CT_FREE(self->source.ptr);
 }
 
 CtToken ctLexerNext(CtLexer *self)
 {
+    int c = lexSkip(self);
 
+    CtToken tok;
+
+    tok.pos = self->pos;
+    self->len = 0;
+
+    if (c == -1)
+    {
+        tok.kind = TK_EOF;
+    }
+    else if (c == 'r' || c == 'R')
+    {
+        /* might be a multiline string */
+        if (lexConsume(self, '"'))
+        {
+            /* is a multiline string */
+            lexMultiString(self, &tok);
+        }
+        else
+        {
+            lexIdent(self, &tok, c);
+        }
+    }
+
+    tok.len = self->len;
+
+    return tok;
 }
 
 #if 0

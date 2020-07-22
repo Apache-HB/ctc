@@ -36,13 +36,11 @@ typedef struct {
 } CtErrorBuffer;
 
 /**
- * expected to behave like fgetc
- *
- * returns -1 on EOF, otherwise returns an int
+ * return -1 on EOF, otherwise returns an int
  * in the range of 0..255, other values will make
  * the lexer error.
  *
- * we also expect \n rather than clrf line endings.
+ * we also expect lf rather than crlf line endings.
  */
 typedef int(*CtNextFunc)(void*);
 
@@ -68,6 +66,12 @@ typedef struct {
      * so no seeking is required
      */
     CtBuffer source;
+
+    /**
+     * since strings can have escaped characters in them
+     * we store them seperatley
+     */
+    CtBuffer strings;
 
     /**
      * the current distance in the stream.
@@ -152,7 +156,7 @@ typedef struct {
     CtSize suffix;
 } CtDigit;
 
-typedef struct {
+typedef enum {
 #define KEY(id, str) id,
 #define OP(id, str) id,
 #include "keys.inc"
