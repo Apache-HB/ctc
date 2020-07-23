@@ -1,5 +1,5 @@
 #ifndef KEY
-#   define KEY(id, str)
+#   define KEY(id, str, flags)
 #endif
 
 #ifndef OP
@@ -7,27 +7,30 @@
 #endif
 
 /* declaration keywords */
-KEY(K_IMPORT, "import")
-KEY(K_DEF, "def")
-KEY(K_ALIAS, "alias")
-KEY(K_STRUCT, "struct")
-KEY(K_ENUM, "enum")
-KEY(K_UNION, "union")
-KEY(K_OBJECT, "object")
-KEY(K_VAR, "var")
-KEY(K_TRAIT, "trait")
+KEY(K_IMPORT, "import", LF_GLOBAL)
+KEY(K_DEF, "def", LF_GLOBAL)
+KEY(K_ALIAS, "alias", LF_GLOBAL)
+KEY(K_STRUCT, "struct", LF_GLOBAL)
+KEY(K_ENUM, "enum", LF_GLOBAL)
+KEY(K_UNION, "union", LF_GLOBAL)
+KEY(K_OBJECT, "object", LF_GLOBAL)
+KEY(K_VAR, "var", LF_GLOBAL)
+KEY(K_TRAIT, "trait", LF_GLOBAL)
 
 /* control keywords */
-KEY(K_IF, "if")
-KEY(K_ELSE, "else")
-KEY(K_WHILE, "while")
-KEY(K_FOR, "for")
-KEY(K_RETURN, "return")
-KEY(K_BRANCH, "branch")
-KEY(K_COERCE, "coerce")
-KEY(K_BREAK, "break")
-KEY(K_CONTINUE, "continue")
+KEY(K_IF, "if", LF_GLOBAL)
+KEY(K_ELSE, "else", LF_GLOBAL)
+KEY(K_WHILE, "while", LF_GLOBAL)
+KEY(K_FOR, "for", LF_GLOBAL)
+KEY(K_RETURN, "return", LF_GLOBAL)
+KEY(K_BRANCH, "branch", LF_GLOBAL)
+KEY(K_COERCE, "coerce", LF_GLOBAL)
+KEY(K_BREAK, "break", LF_GLOBAL)
+KEY(K_CONTINUE, "continue", LF_GLOBAL)
 
+KEY(K_INT, "int", LF_ASM)
+KEY(K_UD2, "ud2", LF_ASM)
+KEY(K_NOP, "nop", LF_ASM)
 
 /* language operators */
 OP(K_AT, "@")
@@ -99,10 +102,6 @@ OP(K_LSQUARE, "[")
 OP(K_RSQUARE, "]")
 OP(K_LBRACE, "{")
 OP(K_RBRACE, "}")
-
-/* unused operators */
-OP(K_DOLLAR, "$")
-OP(K_BACKTICK, "`")
 
 #undef KEY
 #undef OP
