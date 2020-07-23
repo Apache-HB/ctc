@@ -6,4 +6,6 @@ project('cthulhu', 'c',
     ]
 )
 
+cthulhu = library('cthulhu', 'cthulhu/cthulhu.c')
+
 cti = executable('cti', 'tools/cti.c')
