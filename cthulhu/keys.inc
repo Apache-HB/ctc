@@ -6,6 +6,13 @@
 #   define OP(id, str)
 #endif
 
+#ifndef FLAG
+#   define FLAG(name, bit)
+#endif
+
+FLAG(LF_CORE, 1)
+FLAG(LF_ASM, 2)
+
 /* declaration keywords */
 KEY(K_IMPORT, "import", LF_CORE)
 KEY(K_DEF, "def", LF_CORE)
@@ -39,18 +46,18 @@ OP(K_TEND, ">")
 OP(K_SEMI, ";")
 OP(K_COLON, ":")
 OP(K_COLON2, "::")
-OP(K_ARROW, "->")
-OP(K_BIGARROW, "=>")
+OP(K_PTR, "->")
+OP(K_ARROW, "=>")
 OP(K_COMMA, ",")
 OP(K_DOT, ".")
 OP(K_STREAM, "<|")
 OP(K_QUESTION, "?")
+OP(K_ASSIGN, "=")
 
 /* logical operators */
 OP(K_NOT, "!")
 OP(K_NEQ, "!=")
 OP(K_EQ, "==")
-OP(K_ASSIGN, "=")
 
 OP(K_GT, "<")
 OP(K_GTE, "<=")
@@ -105,3 +112,4 @@ OP(K_RBRACE, "}")
 
 #undef KEY
 #undef OP
+#undef FLAG

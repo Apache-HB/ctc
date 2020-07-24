@@ -1,5 +1,58 @@
 grammar cthulhu;
 
+param : (':' Ident '=')? type ;
+
+qual : Ident ('!<' param (',' param)* '>')? ;
+quals : qual ('::' qual)* ;
+
+types : type (',' type)* ;
+
+type
+    : '&' quals
+    | '*' type
+    | '[' type (':' expr)? ']'
+    | 'def' ('(' types? ')')? ('->' type)?
+    | quals
+    ;
+
+expr : assign ;
+
+assign : ternary (('=' | '+=' | '-=' | '/=' | '%=' | '^=' | '&=' | '|=' | '<<=' | '>>=') ternary)* ;
+ternary : logic ('?' ternary? ':' ternary)? ;
+logic : equality (('&&' | '||') equality)* ;
+equality : compare (('==' | '!=') compare)* ;
+compare : bitwise (('<' | '<=' | '>' | '>=') bitwise)* ;
+bitwise : bitshift (('^' | '&' | '|') bitshift)* ;
+bitshift : math (('<<' | '>>') math)* ;
+math : mul (('+' | '-') mul)* ;
+mul : prefix (('*' | '/' | '%') prefix)* ;
+
+prefix : ('+' | '-' | '~' | '!' | '&' | '*')? postfix ;
+
+postfix
+    : primary
+    | postfix '[' expr ']'
+    | postfix '(' args? ')'
+    | postfix '.' Ident
+    | postfix '->' Ident
+    ;
+
+primary
+    : '(' expr ')'
+    | init
+    | quals init?
+    | init
+    | IntLiteral
+    | CharLiteral
+    | StringLiteral
+    ;
+
+arg : ('[' (expr | 'else') ']' '=')? expr ;
+args : arg (',' arg)* ;
+
+init : '{' args? '}' ;
+
+/*
 unit : include* body* EOF ;
 
 include : 'import' path symbols? SEMI ;
@@ -8,7 +61,7 @@ symbols : '(' items ')' ;
 attrib : path call? ;
 attribs : '@' '[' attrib (',' attrib)* ']' ;
 
-builtinBody : '{' /* the contents of builtinBody are IDB */ '}' ;
+builtinBody : '{' /* the contents of builtinBody are IDB  '}' ;
 builtin : '@' path call? builtinBody? ;
 
 body : function | alias | var | struct | union | enum | object | builtin ;
@@ -127,7 +180,7 @@ items : Ident (',' Ident)* ;
 path : Ident ('::' Ident)* ;
 
 SEMI : ';' ;
-
+*/
 IntLiteral : (Base2 | Base10 | Base16) Ident? ;
 StringLiteral : SingleString | MultiString ;
 CharLiteral : '\'' Letter '\'' ;
