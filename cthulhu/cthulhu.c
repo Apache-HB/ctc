@@ -33,20 +33,15 @@ static void bufferPush(CtBuffer *self, int c)
     self->ptr[self->len] = 0;
 }
 
-static CtError err(CtErrorKind type, CtOffset pos)
-{
-    CtError error = {
-        .type = type,
-        .pos = pos
-    };
-
-    return error;
-}
-
-static void report(CtState *self, CtError err)
+static void add_err(CtState *self, CtError err)
 {
     if (self->err_idx < self->max_errs)
         self->errs[self->err_idx++] = err;
+}
+
+static void report(CtState *self, CtErrorKind err)
+{
+    self->perr.type = err;
 }
 
 static int lexNext(CtState *self)
@@ -287,7 +282,7 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
         {
             tok->data.key = K_PTR;
         }
-        else 
+        else
         {
             tok->data.key = lexConsume(self, '=') ? K_SUBEQ : K_SUB;
         }
@@ -304,8 +299,110 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
 
     default:
         tok->data.key = K_INVALID;
-        report(self, err(ERR_INVALID_SYMBOL, self->pos));
+        report(self, ERR_INVALID_SYMBOL);
         break;
+    }
+}
+
+#define LEX_COLLECT(limit, c, pattern, ...) { \
+    int i = 0; \
+    while (1) { \
+        int c = lexPeek(self); \
+        if (pattern) { \
+            __VA_ARGS__ \
+            lexNext(self); \
+            if (i++ > limit) {\
+                report(self, ERR_OVERFLOW); \
+            }} else { break; }}}
+
+static void lexBase2(CtState *self, CtToken *tok)
+{
+    size_t out = 0;
+
+    LEX_COLLECT(64, c, (c == '0' || c == '1'), {
+        out = (out * 2) + (c == '1');
+    })
+
+    tok->data.digit.enc = BASE2;
+    tok->data.digit.num = out;
+}
+
+#define BASE10_LIMIT (18446744073709551615ULL % 10)
+#define BASE10_CUTOFF (18446744073709551615ULL / 10)
+
+static void lexBase10(CtState *self, CtToken *tok, int c)
+{
+    size_t out = c - '0';
+
+    while (1)
+    {
+        c = lexPeek(self);
+        if (isdigit(c))
+        {
+            size_t n = c - '0';
+            if (out > BASE10_CUTOFF || (out == BASE10_CUTOFF && n > BASE10_LIMIT))
+                report(self, ERR_OVERFLOW);
+
+            out = (out * 10) + n;
+        }
+        else
+        {
+            break;
+        }
+
+        lexNext(self);
+    }
+
+    tok->data.digit.enc = BASE10;
+    tok->data.digit.num = out;
+}
+
+static void lexBase16(CtState *self, CtToken *tok)
+{
+    size_t out = 0;
+    LEX_COLLECT(16, c, isxdigit(c), {
+        uint8_t n = c;
+        size_t v = ((n & 0xF) + (n >> 6)) | ((n >> 3) & 0x8);
+        out = (out << 4) | v;
+    })
+
+    tok->data.digit.enc = BASE16;
+    tok->data.digit.num = out;
+}
+
+static void lexDigit(CtState *self, CtToken *tok, int c)
+{
+    tok->type = TK_INT;
+
+    if (c == '0' && lexConsume(self, 'b'))
+    {
+        lexBase2(self, tok);
+    }
+    else if (c == '0' && lexConsume(self, 'x'))
+    {
+        lexBase16(self, tok);
+    }
+    else
+    {
+        lexBase10(self, tok, c);
+    }
+
+    if (isident1(lexPeek(self)))
+    {
+        size_t len = 1;
+        size_t off = lexOff(self);
+        while (isident2(lexPeek(self)))
+        {
+            lexNext(self);
+            len++;
+        }
+
+        tok->data.digit.suffix.offset = off;
+        tok->data.digit.suffix.len = len;
+    }
+    else
+    {
+        tok->data.digit.suffix.offset = 0;
     }
 }
 
@@ -313,6 +410,7 @@ static CtToken lexToken(CtState *self)
 {
     int c = lexSkip(self);
     self->len = 1;
+    CtOffset start = self->pos;
 
     CtToken tok;
 
@@ -326,11 +424,22 @@ static CtToken lexToken(CtState *self)
     }
     else if (isdigit(c))
     {
-
+        lexDigit(self, &tok, c);
     }
     else
     {
         lexSymbol(self, &tok, c);
+    }
+
+    tok.len = self->len;
+    tok.pos = start;
+
+    if (self->perr.type != ERR_NONE)
+    {
+        self->perr.len = self->len;
+        self->perr.pos = start;
+        add_err(self, self->perr);
+        self->perr.type = ERR_NONE;
     }
 
     return tok;
@@ -364,6 +473,7 @@ void ctStateNew(
 
     self->flags = LF_DEFAULT;
 
+    self->perr.type = ERR_NONE;
     self->errs = CT_MALLOC(sizeof(CtError) * max_errs);
     self->max_errs = max_errs;
     self->err_idx = 0;

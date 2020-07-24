@@ -22,13 +22,17 @@ typedef struct {
 typedef enum {
     ERR_NONE = 0,
 
+    // non-fatal
     ERR_OVERFLOW,
+
+    // fatal
     ERR_INVALID_SYMBOL
 } CtErrorKind;
 
 typedef struct {
     CtErrorKind type;
     CtOffset pos;
+    size_t len;
 } CtError;
 
 typedef enum {
@@ -67,6 +71,7 @@ typedef struct {
     } data;
 
     CtOffset pos;
+    size_t len;
 } CtToken;
 
 typedef struct CtState {
@@ -91,6 +96,7 @@ typedef struct CtState {
     int depth;
 
     /* error handling state */
+    CtError perr;
     CtError *errs;
     size_t err_idx;
     size_t max_errs;
