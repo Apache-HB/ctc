@@ -7,18 +7,30 @@
 
 #include "cthulhu/cthulhu.c"
 
+#define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
+
 static int next(void *ptr) { return fgetc(ptr); }
 
 static void range(CtView view, CtBuffer src)
 {
     for (size_t i = 0; i < view.len; i++)
-        putc(src.ptr[view.offset + i], stdout);
+    {
+        int c = src.ptr[view.offset + i];
+        if (c == '\n')
+            break;
+        putc(c, stdout);
+    }
 }
 
 static void range2(CtOffset off, size_t len)
 {
     for (size_t i = 0; i < len; i++)
-        putc(off.source->source.ptr[off.dist + i - 1], stdout);
+    {
+        int c = off.source->source.ptr[off.dist + i - 1];
+        if (c == '\n')
+            break;
+        putc(c, stdout);
+    }
 }
 
 static void ident(CtToken tok)
@@ -66,6 +78,29 @@ static void num(CtToken tok)
         range(tok.data.digit.suffix, tok.pos.source->source);
 }
 
+static void letter(CtToken tok)
+{
+    printf("%lu", tok.data.letter);
+}
+
+static void string(CtToken tok)
+{
+    if (tok.data.str.multiline)
+        printf("R(");
+
+    for (size_t i = 0; i < tok.data.str.len; i++)
+    {
+        char c = tok.pos.source->strings.ptr[tok.data.str.offset + i];
+        switch (c)
+        {
+        case '\0': printf("\\0"); break;
+        case '\n': printf("\\n"); break;
+        default: putc(c, stdout); break;
+        }
+    }
+    printf(")");
+}
+
 static void wtok(CtToken tok)
 {
     switch (tok.type)
@@ -75,6 +110,8 @@ static void wtok(CtToken tok)
     case TK_IDENT: printf("ident("); ident(tok); printf(")"); break;
     case TK_KEY: printf("key("); key(tok); printf(")"); break;
     case TK_INT: printf("int("); num(tok); printf(")"); break;
+    case TK_CHAR: printf("char("); letter(tok); printf(")"); break;
+    case TK_STRING: printf("string("); string(tok); printf(")"); break;
     }
 }
 
@@ -93,15 +130,17 @@ static void ptok(CtToken tok)
     wtok(tok);
     printf("\n | \n");
     printf(" | ");
+    size_t len = 0;
     while (1)
     {
         char c = tok.pos.source->source.ptr[begin++];
         if (c == '\n' || c == '\0')
             break;
         putc(c, stdout);
+        len++;
     }
     printf("\n | ");
-    underline(tok.pos.col - 1, tok.len);
+    underline(tok.pos.col - 1, MIN(tok.len, len));
     printf("\n");
 }
 
@@ -110,25 +149,41 @@ static void error(CtError err)
     printf("error [%d]: ", err.type);
     switch (err.type)
     {
+    case ERR_NONE:
+        printf("no error\n");
+        break;
     case ERR_OVERFLOW:
         printf("integer literal ");
         range2(err.pos, err.len);
         printf(" is too large to fit into largest available integer\n");
         break;
+    case ERR_INVALID_SYMBOL:
+        range2(err.pos, err.len);
+        printf(" is an invalid symbol\n");
+        break;
+    case ERR_STRING_LINEBREAK:
+        printf("single line literal ");
+        range2(err.pos, err.len);
+        printf(" contains a line break\n");
+        break;
     default:
-        printf("no error\n");
+        printf("internal compiler error\n");
         break;
     }
 }
 
-static void errors(CtState *self)
+static int errors(CtState *self)
 {
+    int ret = 0;
     for (size_t i = 0; i < self->err_idx; i++)
     {
+        ret = 1;
         error(self->errs[i]);
     }
 
     self->err_idx = 0;
+
+    return ret;
 }
 
 int main(void)
@@ -140,9 +195,8 @@ int main(void)
     {
         CtToken tok = lexToken(&state);
 
-        ptok(tok);
-
-        errors(&state);
+        if (!errors(&state))
+            ptok(tok);
 
         if (tok.type == TK_END)
             break;

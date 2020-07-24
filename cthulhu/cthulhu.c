@@ -33,17 +33,6 @@ static void bufferPush(CtBuffer *self, int c)
     self->ptr[self->len] = 0;
 }
 
-static void add_err(CtState *self, CtError err)
-{
-    if (self->err_idx < self->max_errs)
-        self->errs[self->err_idx++] = err;
-}
-
-static void report(CtState *self, CtErrorKind err)
-{
-    self->perr.type = err;
-}
-
 static int lexNext(CtState *self)
 {
     int c = self->ahead;
@@ -126,6 +115,14 @@ static struct CtKeyEntry keys[] = {
 static const char *lexView(CtState *self, size_t off)
 {
     return self->source.ptr + off;
+}
+
+static void report(CtState *self, CtError *err)
+{
+    if (self->err_idx < self->max_errs)
+        self->errs[self->err_idx++] = *err;
+
+    err->type = ERR_NONE;
 }
 
 static void lexIdent(CtState *self, CtToken *tok)
@@ -299,7 +296,7 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
 
     default:
         tok->data.key = K_INVALID;
-        report(self, ERR_INVALID_SYMBOL);
+        self->lerr.type = ERR_INVALID_SYMBOL;
         break;
     }
 }
@@ -312,7 +309,7 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
             __VA_ARGS__ \
             lexNext(self); \
             if (i++ > limit) {\
-                report(self, ERR_OVERFLOW); \
+                self->lerr.type = ERR_OVERFLOW; \
             }} else { break; }}}
 
 static void lexBase2(CtState *self, CtToken *tok)
@@ -341,7 +338,7 @@ static void lexBase10(CtState *self, CtToken *tok, int c)
         {
             size_t n = c - '0';
             if (out > BASE10_CUTOFF || (out == BASE10_CUTOFF && n > BASE10_LIMIT))
-                report(self, ERR_OVERFLOW);
+                self->lerr.type = ERR_OVERFLOW;
 
             out = (out * 10) + n;
         }
@@ -406,6 +403,156 @@ static void lexDigit(CtState *self, CtToken *tok, int c)
     }
 }
 
+typedef enum {
+    /* keep going */
+    CR_OK,
+    /* found a newline */
+    CR_NL,
+
+    /* end of the string */
+    CR_END,
+
+    /* end of the file (this is bad) */
+    CR_EOF
+} CharResult;
+
+static CharResult lexSingleChar(CtState *self, int *out)
+{
+    int c = lexNext(self);
+    *out = c;
+
+    if (c == '\\')
+    {
+        c = lexNext(self);
+        switch (c)
+        {
+        case 'b': *out = '\b'; break;
+        case 'a': *out = '\a'; break;
+        case 'f': *out = '\f'; break;
+        case 'r': *out = '\r'; break;
+        case 'n': *out = '\n'; break;
+        case 'v': *out = '\v'; break;
+        case 't': *out = '\t'; break;
+        case '\'':*out = '\''; break;
+        case '"': *out = '\"'; break;
+        case '\\':*out = '\\'; break;
+        case '0': *out = '\0'; break;
+        default:
+            *out = c;
+            self->lerr.type = ERR_INVALID_ESCAPE;
+            break;
+        }
+    }
+    else if (c == '\n')
+    {
+        return CR_NL;
+    }
+    else if (c == '"')
+    {
+        return CR_END;
+    }
+    else if (c == -1)
+    {
+        self->lerr.type = ERR_STRING_EOF;
+        return CR_EOF;
+    }
+
+
+    return CR_OK;
+}
+
+static void lexMultiString(CtState *self, CtToken *tok)
+{
+    tok->type = TK_STRING;
+    int c;
+    size_t len = 0;
+    size_t off = self->strings.len;
+    while (1)
+    {
+        CharResult res = lexSingleChar(self, &c);
+        if (res == CR_END || res == CR_EOF)
+        {
+            break;
+        }
+
+        bufferPush(&self->strings, c);
+        len++;
+    }
+
+    bufferPush(&self->strings, '\0');
+
+    tok->data.str.len = len;
+    tok->data.str.offset = off;
+    tok->data.str.multiline = 1;
+}
+
+static void lexSingleString(CtState *self, CtToken *tok)
+{
+    tok->type = TK_STRING;
+    int c;
+    size_t len = 0;
+    size_t off = self->strings.len;
+    while (1)
+    {
+        CharResult res = lexSingleChar(self, &c);
+        if (res == CR_NL)
+        {
+            self->lerr.type = ERR_STRING_LINEBREAK;
+        }
+        else if (res == CR_END || res == CR_EOF)
+        {
+            break;
+        }
+
+        bufferPush(&self->strings, c);
+        len++;
+    }
+
+    bufferPush(&self->strings, '\0');
+
+    tok->data.str.len = len;
+    tok->data.str.offset = off;
+    tok->data.str.multiline = 0;
+}
+
+static void lexChar(CtState *self, CtToken *tok)
+{
+    tok->type = TK_CHAR;
+    int c;
+    switch (lexSingleChar(self, &c))
+    {
+    case CR_END:
+        c = '"';
+        break;
+
+        /* handle eof */
+    case CR_EOF:
+        tok->data.letter = '\0';
+        return;
+    case CR_NL:
+        tok->data.letter = '\0';
+        self->lerr.type = ERR_STRING_LINEBREAK;
+        return;
+    default:
+        break;
+    }
+
+    tok->data.letter = c;
+
+    /* check for the trailing ' */
+    c = lexNext(self);
+    if (c != '\'')
+    {
+        /* try and gracefully cleanup the users mess */
+        size_t len = self->len;
+        while (!isspace(lexPeek(self)))
+            lexNext(self);
+        self->len = len;
+
+        self->lerr.type = ERR_CHAR_CLOSING;
+    }
+}
+
 static CtToken lexToken(CtState *self)
 {
     int c = lexSkip(self);
@@ -418,9 +565,24 @@ static CtToken lexToken(CtState *self)
     {
         tok.type = TK_END;
     }
+    else if (c == 'r' || c == 'R')
+    {
+        if (lexConsume(self, '"'))
+            lexMultiString(self, &tok);
+        else
+            lexIdent(self, &tok);
+    }
     else if (isident1(c))
     {
         lexIdent(self, &tok);
+    }
+    else if (c == '"')
+    {
+        lexSingleString(self, &tok);
+    }
+    else if (c == '\'')
+    {
+        lexChar(self, &tok);
     }
     else if (isdigit(c))
     {
@@ -434,12 +596,11 @@ static CtToken lexToken(CtState *self)
     tok.len = self->len;
     tok.pos = start;
 
-    if (self->perr.type != ERR_NONE)
+    if (self->lerr.type != ERR_NONE)
     {
-        self->perr.len = self->len;
-        self->perr.pos = start;
-        add_err(self, self->perr);
-        self->perr.type = ERR_NONE;
+        self->lerr.len = self->len;
+        self->lerr.pos = start;
+        report(self, &self->lerr);
     }
 
     return tok;
@@ -473,7 +634,9 @@ void ctStateNew(
 
     self->flags = LF_DEFAULT;
 
+    self->lerr.type = ERR_NONE;
     self->perr.type = ERR_NONE;
+
     self->errs = CT_MALLOC(sizeof(CtError) * max_errs);
     self->max_errs = max_errs;
     self->err_idx = 0;

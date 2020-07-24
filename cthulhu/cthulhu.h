@@ -22,11 +22,25 @@ typedef struct {
 typedef enum {
     ERR_NONE = 0,
 
-    // non-fatal
+    /* non-fatal */
+
+    /* integer literal was too large to fit into max size */
     ERR_OVERFLOW,
 
-    // fatal
-    ERR_INVALID_SYMBOL
+    /* invalid escape sequence in string/char literal */
+    ERR_INVALID_ESCAPE,
+
+    /* a linebreak was found inside a single line string */
+    ERR_STRING_LINEBREAK,
+
+    /* fatal */
+    ERR_INVALID_SYMBOL,
+
+    /* the EOF was found while lexing a string */
+    ERR_STRING_EOF,
+
+    /* the closing ' was missing while parsing a char literal */
+    ERR_CHAR_CLOSING
 } CtErrorKind;
 
 typedef struct {
@@ -49,6 +63,14 @@ typedef struct {
 } CtView;
 
 typedef struct {
+    size_t offset;
+    size_t len;
+
+    /* TODO: optimize this */
+    int multiline;
+} CtString;
+
+typedef struct {
     enum { BASE2, BASE10, BASE16 } enc;
     size_t num;
     CtView suffix;
@@ -59,6 +81,8 @@ typedef struct {
         TK_IDENT,
         TK_KEY,
         TK_INT,
+        TK_STRING,
+        TK_CHAR,
         TK_END,
 
         TK_LOOKAHEAD
@@ -66,6 +90,8 @@ typedef struct {
 
     union {
         CtView ident;
+        CtString str;
+        size_t letter;
         CtKey key;
         CtDigit digit;
     } data;
@@ -96,7 +122,9 @@ typedef struct CtState {
     int depth;
 
     /* error handling state */
+    CtError lerr;
     CtError perr;
+
     CtError *errs;
     size_t err_idx;
     size_t max_errs;
