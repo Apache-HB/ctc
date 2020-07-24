@@ -195,13 +195,9 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
         {
             tok->data.key = K_ARROW;
         }
-        else if (lexConsume(self, '='))
-        {
-            tok->data.key = K_EQ;
-        }
         else
         {
-            tok->data.key = K_ASSIGN;
+            tok->data.key = lexConsume(self, '=') ? K_EQ : K_ASSIGN;
         }
         break;
 
