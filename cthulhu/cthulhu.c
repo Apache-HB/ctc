@@ -33,6 +33,22 @@ static void bufferPush(CtBuffer *self, int c)
     self->ptr[self->len] = 0;
 }
 
+static CtError err(CtErrorKind type, CtOffset pos)
+{
+    CtError error = {
+        .type = type,
+        .pos = pos
+    };
+
+    return error;
+}
+
+static void report(CtState *self, CtError err)
+{
+    if (self->err_idx < self->max_errs)
+        self->errs[self->err_idx++] = err;
+}
+
 static int lexNext(CtState *self)
 {
     int c = self->ahead;
@@ -189,6 +205,65 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
             tok->data.key = lexConsume(self, '=') ? K_GTE : K_GT;
         }
         break;
+    case '*':
+        tok->data.key = lexConsume(self, '=') ? K_MULEQ : K_MUL;
+        break;
+    case '/':
+        tok->data.key = lexConsume(self, '=') ? K_DIVEQ : K_DIV;
+        break;
+    case '%':
+        tok->data.key = lexConsume(self, '=') ? K_MODEQ : K_MOD;
+        break;
+    case '^':
+        tok->data.key = lexConsume(self, '=') ? K_XOREQ : K_XOR;
+        break;
+    case '&':
+        if (lexConsume(self, '&'))
+        {
+            tok->data.key = K_AND;
+        }
+        else
+        {
+            tok->data.key = lexConsume(self, '=') ? K_BITANDEQ : K_BITAND;
+        }
+        break;
+    case '|':
+        if (lexConsume(self, '|'))
+        {
+            tok->data.key = K_OR;
+        }
+        else
+        {
+            tok->data.key = lexConsume(self, '=') ? K_BITOREQ : K_BITOR;
+        }
+        break;
+    case '@':
+        tok->data.key = K_AT;
+        break;
+    case '?':
+        tok->data.key = K_QUESTION;
+        break;
+    case '~':
+        tok->data.key = K_BITNOT;
+        break;
+    case '(':
+        tok->data.key = K_LPAREN;
+        break;
+    case ')':
+        tok->data.key = K_RPAREN;
+        break;
+    case '[':
+        tok->data.key = K_LSQUARE;
+        break;
+    case ']':
+        tok->data.key = K_RSQUARE;
+        break;
+    case '{':
+        tok->data.key = K_LBRACE;
+        break;
+    case '}':
+        tok->data.key = K_RBRACE;
+        break;
 
     case '=':
         if (lexConsume(self, '>'))
@@ -201,7 +276,35 @@ static void lexSymbol(CtState *self, CtToken *tok, int c)
         }
         break;
 
+    case ':':
+        tok->data.key = lexConsume(self, ':') ? K_COLON2 : K_COLON;
+        break;
+    case '+':
+        tok->data.key = lexConsume(self, '=') ? K_ADDEQ : K_ADD;
+        break;
+    case '-':
+        if (lexConsume(self, '>'))
+        {
+            tok->data.key = K_PTR;
+        }
+        else 
+        {
+            tok->data.key = lexConsume(self, '=') ? K_SUBEQ : K_SUB;
+        }
+        break;
+    case '.':
+        tok->data.key = K_DOT;
+        break;
+    case ',':
+        tok->data.key = K_COMMA;
+        break;
+    case ';':
+        tok->data.key = K_SEMI;
+        break;
+
     default:
+        tok->data.key = K_INVALID;
+        report(self, err(ERR_INVALID_SYMBOL, self->pos));
         break;
     }
 }
@@ -241,7 +344,8 @@ void ctStateNew(
     CtState *self,
     void *stream,
     CtNextFunc next,
-    const char *name
+    const char *name,
+    size_t max_errs
 )
 {
     (void)lexToken;
@@ -259,4 +363,8 @@ void ctStateNew(
     self->pos.line = 0;
 
     self->flags = LF_DEFAULT;
+
+    self->errs = CT_MALLOC(sizeof(CtError) * max_errs);
+    self->max_errs = max_errs;
+    self->err_idx = 0;
 }

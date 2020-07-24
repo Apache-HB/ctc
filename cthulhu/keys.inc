@@ -50,7 +50,6 @@ OP(K_PTR, "->")
 OP(K_ARROW, "=>")
 OP(K_COMMA, ",")
 OP(K_DOT, ".")
-OP(K_STREAM, "<|")
 OP(K_QUESTION, "?")
 OP(K_ASSIGN, "=")
 

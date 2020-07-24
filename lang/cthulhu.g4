@@ -8,7 +8,7 @@ quals : qual ('::' qual)* ;
 types : type (',' type)* ;
 
 type
-    : '&' quals
+    : '&' type
     | '*' type
     | '[' type (':' expr)? ']'
     | 'def' ('(' types? ')')? ('->' type)?
@@ -41,7 +41,6 @@ primary
     : '(' expr ')'
     | init
     | quals init?
-    | init
     | IntLiteral
     | CharLiteral
     | StringLiteral

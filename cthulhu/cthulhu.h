@@ -19,25 +19,17 @@ typedef struct {
     size_t line;
 } CtOffset;
 
-typedef struct CtState {
-    const char *name;
-    void *stream;
-    CtNextFunc next;
-    int ahead;
+typedef enum {
+    ERR_NONE = 0,
 
+    ERR_OVERFLOW,
+    ERR_INVALID_SYMBOL
+} CtErrorKind;
+
+typedef struct {
+    CtErrorKind type;
     CtOffset pos;
-    size_t len;
-    CtBuffer source;
-    CtBuffer strings;
-
-    enum {
-#define FLAG(name, bit) name = (1 << bit),
-#include "keys.inc"
-        LF_DEFAULT = LF_CORE
-    } flags;
-
-    int depth;
-} CtState;
+} CtError;
 
 typedef enum {
 #define KEY(id, str, flags) id,
@@ -77,11 +69,39 @@ typedef struct {
     CtOffset pos;
 } CtToken;
 
+typedef struct CtState {
+    /* stream state */
+    const char *name;
+    void *stream;
+    CtNextFunc next;
+    int ahead;
+    CtBuffer source;
+
+    /* lexing state */
+    CtOffset pos;
+    size_t len;
+    CtBuffer strings;
+
+    enum {
+#define FLAG(name, bit) name = (1 << bit),
+#include "keys.inc"
+        LF_DEFAULT = LF_CORE
+    } flags;
+
+    int depth;
+
+    /* error handling state */
+    CtError *errs;
+    size_t err_idx;
+    size_t max_errs;
+} CtState;
+
 void ctStateNew(
     CtState *self,
     void *stream,
     CtNextFunc next,
-    const char *name
+    const char *name,
+    size_t max_errs
 );
 
 #endif /* CTHULHU_H */

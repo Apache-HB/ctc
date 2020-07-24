@@ -12,7 +12,7 @@ static int next(void *ptr) { return fgetc(ptr); }
 int main(void)
 {
     CtState state;
-    ctStateNew(&state, stdin, next, "stdin");
+    ctStateNew(&state, stdin, next, "stdin", 20);
 
     CtToken tok = lexToken(&state);
 
