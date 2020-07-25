@@ -20,36 +20,6 @@ typedef struct {
 } CtOffset;
 
 typedef enum {
-    ERR_NONE = 0,
-
-    /* non-fatal */
-
-    /* integer literal was too large to fit into max size */
-    ERR_OVERFLOW,
-
-    /* invalid escape sequence in string/char literal */
-    ERR_INVALID_ESCAPE,
-
-    /* a linebreak was found inside a single line string */
-    ERR_STRING_LINEBREAK,
-
-    /* fatal */
-    ERR_INVALID_SYMBOL,
-
-    /* the EOF was found while lexing a string */
-    ERR_STRING_EOF,
-
-    /* the closing ' was missing while parsing a char literal */
-    ERR_CHAR_CLOSING
-} CtErrorKind;
-
-typedef struct {
-    CtErrorKind type;
-    CtOffset pos;
-    size_t len;
-} CtError;
-
-typedef enum {
 #define KEY(id, str, flags) id,
 #define OP(id, str) id,
 #include "keys.inc"
@@ -100,6 +70,69 @@ typedef struct {
     size_t len;
 } CtToken;
 
+typedef enum {
+    ERR_NONE = 0,
+
+    /* non-fatal */
+
+    /* integer literal was too large to fit into max size */
+    ERR_OVERFLOW,
+
+    /* invalid escape sequence in string/char literal */
+    ERR_INVALID_ESCAPE,
+
+    /* a linebreak was found inside a single line string */
+    ERR_STRING_LINEBREAK,
+
+
+
+    /* fatal */
+
+    /* invalid character found while lexing */
+    ERR_INVALID_SYMBOL,
+
+    /* the EOF was found while lexing a string */
+    ERR_STRING_EOF,
+
+    /* the closing ' was missing while parsing a char literal */
+    ERR_CHAR_CLOSING,
+
+    /* an unexpected keyword was encountered while parsing */
+    ERR_UNEXPECTED_KEY,
+
+    /* missing closing ) */
+    ERR_MISSING_BRACE
+} CtErrorKind;
+
+typedef struct {
+    CtErrorKind type;
+    CtOffset pos;
+    size_t len;
+
+    /* associated token */
+    CtToken tok;
+} CtError;
+
+
+typedef enum {
+    AK_BINARY,
+    AK_UNARY,
+    AK_LITERAL
+} CtASTKind;
+
+typedef struct CtAST {
+    CtASTKind type;
+    CtToken tok;
+
+    union {
+        struct {
+            struct CtAST *lhs;
+            struct CtAST *rhs;
+        } binary;
+        struct CtAST *expr;
+    } data;
+} CtAST;
+
 typedef struct CtState {
     /* stream state */
     const char *name;
@@ -128,6 +161,9 @@ typedef struct CtState {
     CtError *errs;
     size_t err_idx;
     size_t max_errs;
+
+    /* parsing state */
+    CtToken tok;
 } CtState;
 
 void ctStateNew(

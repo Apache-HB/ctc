@@ -45,7 +45,7 @@ static void key(CtToken tok)
 #define KEY(id, str, flags) case id: printf(str); break;
 #define OP(id, str) case id: printf("%s", str); break;
 #include "cthulhu/keys.inc"
-    default: printf("invalid"); break;
+    default: printf("INVALID"); break;
     }
 }
 
@@ -186,12 +186,65 @@ static int errors(CtState *self)
     return ret;
 }
 
+static void pliteral(CtAST *node)
+{
+    switch (node->tok.type)
+    {
+    case TK_INT: num(node->tok); break;
+    case TK_CHAR: letter(node->tok); break;
+    case TK_STRING: string(node->tok); break;
+    default: printf("FUCK"); break;
+    }
+}
+
+static void pnode(CtAST *node)
+{
+    if (!node)
+    {
+        printf("NULL");
+        return;
+    }
+
+    switch (node->type)
+    {
+    case AK_BINARY:
+        printf("(");
+        pnode(node->data.binary.lhs);
+        printf(" ");
+        key(node->tok);
+        printf(" ");
+        pnode(node->data.binary.rhs);
+        printf(")");
+        break;
+    case AK_LITERAL:
+        pliteral(node);
+        break;
+    default:
+        printf("ERROR");
+        break;
+    }
+}
+
 int main(void)
 {
+    printf(">>> ");
     CtState state;
     ctStateNew(&state, stdin, next, "stdin", 20);
 
-    for (;;)
+    while (1)
+    {
+        CtAST *node = pStmt(&state);
+        if (!errors(&state))
+        {
+            pnode(node);
+            printf("\n");
+        }
+        printf(">>> ");
+    }
+
+    (void)ptok;
+
+    /*for (;;)
     {
         CtToken tok = lexToken(&state);
 
@@ -200,5 +253,5 @@ int main(void)
 
         if (tok.type == TK_END)
             break;
-    }
+    }*/
 }

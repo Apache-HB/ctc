@@ -606,6 +606,176 @@ static CtToken lexToken(CtState *self)
     return tok;
 }
 
+static CtToken pNext(CtState *self)
+{
+    CtToken tok = self->tok;
+
+    if (tok.type == TK_LOOKAHEAD)
+    {
+        tok = lexToken(self);
+    }
+    else
+    {
+        self->tok.type = TK_LOOKAHEAD;
+    }
+
+    return tok;
+}
+
+static CtToken pPeek(CtState *self)
+{
+    self->tok = pNext(self);
+
+    return self->tok;
+}
+
+static int pExpect(CtState *self, CtKey key)
+{
+    CtToken tok = pNext(self);
+    if (tok.type != TK_KEY || tok.data.key != key)
+    {
+        self->perr.type = ERR_UNEXPECTED_KEY;
+        self->perr.tok = tok;
+        return 0;
+    }
+    return 1;
+}
+
+static CtAST *ast(CtASTKind type)
+{
+    CtAST *out = CT_MALLOC(sizeof(CtAST));
+    out->type = type;
+    return out;
+}
+
+typedef enum {
+    OP_ERROR = 0,
+
+    OP_ASSIGN = 1,
+    OP_TERNARY = 2,
+    OP_LOGIC = 3,
+    OP_EQUAL = 4,
+    OP_COMPARE = 5,
+    OP_BITS = 6,
+    OP_SHIFT = 7,
+    OP_MATH = 8,
+    OP_MUL = 9
+} OpPrec;
+
+static OpPrec prec(CtToken tok)
+{
+    if (tok.type != TK_KEY)
+        return OP_ERROR;
+
+    switch (tok.data.key)
+    {
+    case K_ASSIGN: case K_ADDEQ: case K_SUBEQ:
+    case K_MULEQ: case K_DIVEQ: case K_MODEQ:
+    case K_XOREQ: case K_BITANDEQ: case K_BITOREQ:
+    case K_SHLEQ: case K_SHREQ:
+        return OP_ASSIGN;
+    case K_QUESTION:
+        return OP_TERNARY;
+    case K_AND: case K_OR:
+        return OP_LOGIC;
+    case K_EQ: case K_NEQ:
+        return OP_EQUAL;
+    case K_GT: case K_GTE: case K_LT: case K_LTE:
+        return OP_COMPARE;
+    case K_XOR: case K_BITAND: case K_BITOR:
+        return OP_BITS;
+    case K_SHL: case K_SHR:
+        return OP_SHIFT;
+    case K_ADD: case K_SUB:
+        return OP_MATH;
+    case K_MUL: case K_DIV: case K_MOD:
+        return OP_MUL;
+    default:
+        return OP_ERROR;
+    }
+}
+
+#define IS_UNARY(key) (key == K_ADD || key == K_SUB || key == K_BITNOT || key == K_NOT || key == K_BITAND || key == K_MUL)
+
+static CtAST *pExpr(CtState *self);
+
+static CtAST *pPrimary(CtState *self)
+{
+    CtToken tok = pPeek(self);
+    CtAST *node = NULL;
+
+    if (tok.type == TK_CHAR || tok.type == TK_INT || tok.type == TK_STRING)
+    {
+        node = ast(AK_LITERAL);
+        node->tok = pNext(self);
+    }
+    if (tok.type == TK_KEY)
+    {
+        if (IS_UNARY(tok.data.key))
+        {
+            node = ast(AK_UNARY);
+            node->tok = pNext(self);
+            node->data.expr = pPrimary(self);
+        }
+        else if (tok.data.key == K_LPAREN)
+        {
+            pNext(self);
+            node = pExpr(self);
+            if(!pExpect(self, K_RPAREN))
+                self->perr.type = ERR_MISSING_BRACE;
+        }
+    }
+
+    return node;
+}
+
+static CtAST *binop(CtAST *lhs, CtAST *rhs, CtToken tok)
+{
+    CtAST *node = ast(AK_BINARY);
+    node->tok = tok;
+    node->data.binary.lhs = lhs;
+    node->data.binary.rhs = rhs;
+    return node;
+}
+
+static CtAST *pBinary(CtState *self, OpPrec mprec)
+{
+    CtAST *lhs = pPrimary(self);
+
+    while (1)
+    {
+        CtToken cur = pPeek(self);
+        if (!prec(cur) || (prec(cur) < mprec))
+            break;
+
+        CtToken op = pNext(self);
+
+        CtAST *rhs = pBinary(self, prec(op) + 1);
+
+        if (!rhs)
+            return NULL;
+
+        lhs = binop(lhs, rhs, op);
+    }
+
+    return lhs;
+}
+
+static CtAST *pExpr(CtState *self)
+{
+    return pBinary(self, OP_ASSIGN);
+}
+
+static CtAST *pStmt(CtState *self)
+{
+    CtAST *node = pExpr(self);
+    pExpect(self, K_SEMI);
+
+    if (self->perr.type != ERR_NONE)
+        report(self, &self->perr);
+    return node;
+}
+
 /**
  * public api
  */
@@ -618,7 +788,6 @@ void ctStateNew(
     size_t max_errs
 )
 {
-    (void)lexToken;
     self->stream = stream;
     self->next = next;
     self->ahead = next(stream);
@@ -640,4 +809,6 @@ void ctStateNew(
     self->errs = CT_MALLOC(sizeof(CtError) * max_errs);
     self->max_errs = max_errs;
     self->err_idx = 0;
+
+    self->tok.type = TK_LOOKAHEAD;
 }
