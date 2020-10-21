@@ -7,6 +7,118 @@
 #   error "CT_MALLOC, CT_REALLOC, and CT_FREE must be defined"
 #endif
 
+static int ctNext(CtLex *self)
+{
+    int c = self->c;
+    self->c = self->next(self->stream);
+
+    self->pos.dist++;
+
+    if (c == '\n')
+    {
+        self->pos.col = 0;
+        self->pos.line++;
+    }
+    else
+    {
+        self->pos.col++;
+    }   
+
+    return c;
+}
+
+static int ctPeek(CtLex *self) 
+{
+    return self->c;
+}
+
+CtLex ctLexInit(void *stream, int(*next)(void*))
+{
+    CtLex self;
+
+    self.stream = stream;
+    self.next = next;
+
+    self.c = next(stream);
+
+    self.pos.dist = 1;
+    if (self.c == '\n')
+    {
+        self.pos.line = 1;
+        self.pos.col = 0;
+    }
+    else
+    {
+        self.pos.line = 0;
+        self.pos.col = 1;
+    }
+
+    return self;
+}
+
+static int nextReal(CtLex *self)
+{
+    int c = ctNext(self);
+
+    while (isspace(c))
+    {
+        c = ctNext(self);
+
+        if (c == '#')
+        {
+            while (c != '\n')
+            {
+                c = ctNext(self);
+            }
+        }
+    }
+
+    return c;
+}
+
+static CtToken tok(CtTokenKind kind, CtPos pos)
+{
+    CtToken token;
+    token.kind = kind;
+    token.pos = pos;
+
+    return token;
+}
+
+static int isident1(int c) { return isalpha(c) || c == '_'; }
+static int isident2(int c) { return isalnum(c) || c == '_'; }
+
+CtToken ctTok(CtLex *self)
+{
+    int c = nextReal(self);
+    CtPos here = self->pos;
+    CtToken out;
+
+    if (c == 0) 
+    {
+        out = tok(TK_END, here);
+    }
+    else if (isident1(c))
+    {
+
+    }
+    else if (isdigit(c))
+    {
+
+    }
+    else if (c == '"')
+    {
+
+    }
+    else
+    {
+        
+    }
+
+    return out;
+}
+
+#if 0
 static int isident1(int c) { return isalpha(c) || c == '_'; }
 static int isident2(int c) { return isalnum(c) || c == '_'; }
 
@@ -812,3 +924,5 @@ void ctStateNew(
 
     self->tok.type = TK_LOOKAHEAD;
 }
+
+#endif

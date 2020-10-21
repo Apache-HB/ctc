@@ -1,6 +1,75 @@
 #ifndef CTHULHU_H
 #define CTHULHU_H
 
+/* an error code */
+typedef enum {
+    /* no error */
+    CT_OK = 0,
+
+    /**
+     *  invalid character in stream
+     * such as ` or $ which are both currently
+     * not in the grammar
+     */
+    CT_CHAR
+} CtErr;
+
+/* any error with extra data as needed */
+typedef struct {
+    CtErr err;
+} CtError;
+
+typedef struct {
+    long dist;
+    long line;
+    int col;
+} CtPos;
+
+typedef struct {
+    void *stream;
+    int(*next)(void*);
+
+    int c;
+
+    CtPos pos;
+} CtLex;
+
+typedef enum {
+    TK_INVALID,
+
+    TK_END,
+    TK_IDENT,
+    TK_STRING,
+    TK_KEY,
+    TK_DIGIT
+} CtTokenKind;
+
+typedef struct {
+    char *ptr;
+    int len;
+    int multiline;
+} CtString;
+
+typedef union {
+    CtString str;
+} CtTokenData;
+
+typedef struct {
+    CtTokenKind kind;
+    CtTokenData data;
+    CtPos pos;
+} CtToken;
+
+CtLex ctLexInit(void *stream, int(*next)(void*));
+
+CtToken ctTok(CtLex *self);
+
+#endif /* CTHULHU_H */
+
+
+
+#if 0
+
 #include <stdint.h>
 #include <stddef.h>
 
@@ -174,4 +243,4 @@ void ctStateNew(
     size_t max_errs
 );
 
-#endif /* CTHULHU_H */
+#endif
