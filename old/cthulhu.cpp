@@ -76,17 +76,13 @@ static int nextReal(CtLex *self)
     return c;
 }
 
-static CtToken tok(CtTokenKind kind, CtPos pos)
-{
-    CtToken token;
-    token.kind = kind;
-    token.pos = pos;
-
-    return token;
-}
-
 static int isident1(int c) { return isalpha(c) || c == '_'; }
 static int isident2(int c) { return isalnum(c) || c == '_'; }
+
+static void parseIdent(CtLex *self, int c, CtToken *out)
+{
+    out->kind = TK_KEY;
+}
 
 CtToken ctTok(CtLex *self)
 {
@@ -94,9 +90,11 @@ CtToken ctTok(CtLex *self)
     CtPos here = self->pos;
     CtToken out;
 
+    out.pos = self->pos;
+
     if (c == 0) 
     {
-        out = tok(TK_END, here);
+        out.kind = TK_END;
     }
     else if (isident1(c))
     {

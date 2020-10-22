@@ -1,9 +1,11 @@
-project('cthulhu', 'c',
+project('cthulhu', 'cpp',
     default_options : [
-        'c_std=c99',
+        'cpp_std=c++17',
+        'cpp_rtti=false',
+        'cpp_eh=none',
         'werror=true',
         'warning_level=3'
     ]
 )
 
-cti = executable('cti', 'tools/cti.c')
+cthulhu = library('cthulhu', 'cthulhu/cthulhu.cpp')
