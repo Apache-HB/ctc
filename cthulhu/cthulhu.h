@@ -1,5 +1,8 @@
 #pragma once
 
+#include <variant>
+#include <string>
+
 struct Where {
     int dist = 0;
     int line = 0;
@@ -7,78 +10,44 @@ struct Where {
     int len = 0;
 };
 
-enum struct Type {
-    invalid,
-    end,
-    ident,
-    key,
-    str
-};
-
-struct Range {
-    char* ptr;
-    int len;
-
-    static bool cmp(const Range& lhs, const Range& rhs);
-};
-
-union TokenData {
-    Range ident;
-};
-
-struct Token {
-    Where pos;
-    Type type;
-    TokenData data;
-};
-
-struct Buffer {
-    Buffer(int init);
-
-    void push(char c);
-
-    char* ptr;
-    int len;
-    int size;
-};
-
 struct Stream {
-    Stream(void* stream, int(*get)(void*));
+    Stream(void* in, int(*func)(void*))
+        : stream(in)
+        , get(func)
+    { 
+        ahead = get(stream);
+    }
 
-    int next();
-    int peek();
-    Where here() const;
+    int next() { 
+        int c = ahead;
+        ahead = get(stream);
 
-    Buffer file;
+        return c;
+    }
+
+    int peek() {
+        return ahead;
+    }
+
     void* stream;
     int(*get)(void*);
     int ahead;
     Where pos;
 };
 
-struct Node {
-    Node* lhs;
-    Node* rhs;
-    Range it;
+enum struct Key {
+
 };
 
-struct Intern : Buffer {
-    Node* base = nullptr;
-
-    char* begin();
-    int end(char* str);
-
-    Range intern(char* str, int width);
+struct Token {
+    std::variant<Key> data;
+    Where where;
 };
 
-struct Lexer : Stream {
-    Token lex();
+struct Lexer {
+    Token next() {
 
-    Token ident(int c);
-    Token digit(int c);
-    Token string();
-    Token symbol(int c);
+    }
 
-    // skip whitespace and comments
-    int skip();
+    Stream in;
 };
