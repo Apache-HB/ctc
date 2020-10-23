@@ -84,6 +84,9 @@ int Intern::end(char* str) {
 Range Intern::intern(char* str, int width) {
     Range it = { str, width };
     Node** walk = &base;
+    while (*walk) {
+        
+    }
 }
 
 Token Lexer::lex() {
