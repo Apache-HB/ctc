@@ -15,13 +15,15 @@ enum struct Type {
     str
 };
 
-struct Ident {
-    char *ptr;
+struct Range {
+    char* ptr;
     int len;
+
+    static bool cmp(const Range& lhs, const Range& rhs);
 };
 
 union TokenData {
-    Ident ident;
+    Range ident;
 };
 
 struct Token {
@@ -31,11 +33,13 @@ struct Token {
 };
 
 struct Buffer {
+    Buffer(int init);
+
+    void push(char c);
+
     char* ptr;
     int len;
     int size;
-
-    void push(char c);
 };
 
 struct Stream {
@@ -52,8 +56,28 @@ struct Stream {
     Where pos;
 };
 
+struct Node {
+    Node* lhs;
+    Node* rhs;
+    Range it;
+};
+
+struct Intern : Buffer {
+    Node* base = nullptr;
+
+    char* begin();
+    int end(char* str);
+
+    Range intern(char* str, int width);
+};
+
 struct Lexer : Stream {
     Token lex();
+
+    Token ident(int c);
+    Token digit(int c);
+    Token string();
+    Token symbol(int c);
 
     // skip whitespace and comments
     int skip();

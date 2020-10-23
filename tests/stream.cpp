@@ -11,7 +11,13 @@ int main() {
     auto ss = SS { R"(hello
     again)" };
 
-    auto s = Stream((void*)&ss, [](auto c) -> int { auto ss = (SS*)c; return ss->str[ss->idx++]; });
+    auto s = Stream((void*)&ss, [](auto s) -> int { 
+        auto ss = (SS*)s; 
+        auto c = ss->str[ss->idx];
+        if (c != 0)
+            ss->idx++;
+        return c;
+    });
 
     auto here = s.here();
 
