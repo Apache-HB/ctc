@@ -1,12 +1,10 @@
 #pragma once
 
-#include <cstdint>
-
 struct Where {
-    int dist;
-    int line;
-    int col;
-    int len;
+    int dist = 0;
+    int line = 0;
+    int col = 0;
+    int len = 0;
 };
 
 enum struct Type {
@@ -17,23 +15,46 @@ enum struct Type {
     str
 };
 
-struct String {
+struct Ident {
     char *ptr;
     int len;
 };
 
-#define UNION(name) struct name { union {
-#define END }; };
-
-struct TokenData {
-    union {
-        String str;
-        String ident;
-    };
+union TokenData {
+    Ident ident;
 };
 
-struct Token : TokenData {
+struct Token {
     Where pos;
     Type type;
     TokenData data;
+};
+
+struct Buffer {
+    char* ptr;
+    int len;
+    int size;
+
+    void push(char c);
+};
+
+struct Stream {
+    Stream(void* stream, int(*get)(void*));
+
+    int next();
+    int peek();
+    Where here() const;
+
+    Buffer file;
+    void* stream;
+    int(*get)(void*);
+    int ahead;
+    Where pos;
+};
+
+struct Lexer : Stream {
+    Token lex();
+
+    // skip whitespace and comments
+    int skip();
 };

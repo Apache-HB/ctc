@@ -9,3 +9,5 @@ project('cthulhu', 'cpp',
 )
 
 cthulhu = library('cthulhu', 'cthulhu/cthulhu.cpp')
+
+test('stream', executable('stream', 'tests/stream.cpp', link_with : cthulhu))
