@@ -8,6 +8,8 @@ project('cthulhu', 'cpp',
     ]
 )
 
-cthulhu = library('cthulhu', 'cthulhu/cthulhu.cpp')
+fmt = subproject('fmt').get_variable('fmt_dep')
 
-test('stream', executable('stream', 'tests/stream.cpp', link_with : cthulhu))
+cthulhu = executable('cthulhu', 'cthulhu/cthulhu.cpp',
+    dependencies : fmt
+)
