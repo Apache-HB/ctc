@@ -9,81 +9,77 @@ struct Where {
     int line = 0;
     int col = 0;
     int len = 0;
-    const struct Stream* source;
 };
 
 struct Stream {
-    Stream(void* in, int(*func)(void*), std::string id)
-        : stream(in)
-        , get(func)
-        , name(id)
-    { 
-        ahead = get(stream);
-        pos.source = this;
-    }
+    Stream(void* in, int(*func)(void*), std::string id);
 
-    int next() { 
-        int c = ahead;
-        ahead = get(stream);
+    // get the next character from the file
+    // and then move to the next character
+    int next();
 
-        buffer.push_back(c);
+    // get the next character without
+    // moving forward in the stream
+    int peek();
 
-        pos.dist++;
-        if (c == '\n') {
-            pos.line++;
-            pos.col = 0;
-        } else {
-            pos.col++;
-        }
+    // check if the next char is c
+    // and if it is get the next character
+    bool eat(char c);
 
-        return c;
-    }
-
-    int peek() {
-        return ahead;
-    }
-
+    // native file stream
     void* stream;
+    // native function to get next char
+    // should return 0 at EOF
     int(*get)(void*);
-    int ahead;
+    // filename
     std::string name;
-    Where pos;
 
+    // lookahead char
+    int ahead;
+    // current location
+    Where pos;
+    // files read contents
     std::string buffer;
 };
 
-std::vector<std::string> split(std::string str, std::string tok) {
-    std::vector<std::string> out;
-    while (str.size()) {
-        auto idx = str.find(tok);
-        if (idx != std::string::npos) {
-            out.push_back(str.substr(0, idx));
-            str = str.substr(idx + tok.size());
-            if (!str.size())
-                out.push_back(str);
-        } else {
-            out.push_back(str);
-            str = "";
-        }
-    }
-    return out;
-}
-
-struct Error {
-    std::string msg;
+struct Token {
     Where where;
-    std::vector<std::string> notes;
 };
 
-std::string error(
-    const std::vector<Error>& errors
-) {
-    int len = 0;
+struct Ident : Token {
+    std::string id;
+};
 
+struct Key : Token {
+    enum { invalid } key;
+};
+
+struct End : Token { };
+struct Invalid : Token { };
+
+
+struct Lex : Stream {
+    Token* get();
+};
+
+// errors are formatted like
+// file.ct -> [line:col] [line:col]
+//        * error message
+//        |
+//  line1 | line content
+//        | ^~~~ error 
+//        | ...
+// line20 | more content here
+//        |      ^~~~~~~ message
+//        * note1
+//        * note2
+#if 0
+std::string error(const std::vector<Error>& errors) {
+    int len = 0;
     for (auto err : errors) {
         len = std::max(len, fmt::format("{}", err.where.line).length());
     }
-#if 0
+
     auto in = it.source;
     std::string out = fmt::format("{} -> [{}:{}]\n", in->name, it.line, it.col);
 
@@ -116,5 +112,5 @@ std::string error(
     }
 
     return out;
-#endif
 }
+#endif

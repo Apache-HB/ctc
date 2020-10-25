@@ -2,19 +2,47 @@
 
 #include <stdio.h>
 
+Stream::Stream(void* in, int(*func)(void*), std::string id)
+    : stream(in)
+    , get(func)
+    , name(id)
+{ 
+    ahead = get(stream);
+    pos.source = this;
+}
+
+int Stream::next() { 
+    int c = ahead;
+    if (!c)
+        return c;
+
+    ahead = get(stream);
+    buffer.push_back(c);
+
+    pos.dist++;
+    if (c == '\n') {
+        pos.line++;
+        pos.col = 0;
+    } else {
+        pos.col++;
+    }
+
+    return c;
+}
+
+int Stream::peek() {
+    return ahead;
+}
+
+bool Stream::eat(char c) {
+    if (peek() == c) {
+        next();
+        return true;
+    }
+    return false;
+}
+
 int main(int argc, char** argv) {
     (void)argc;
-    void* file = (void*)fopen(argv[1], "r");
-    auto stream = Stream(file, [](void* f) -> int {
-        auto n = fgetc((FILE*)f);
-        if (n == -1)
-            return 0;
-        return n;
-    }, argv[1]);
-
-    while (stream.next() != 0);
-
-    Where here = { 9, 1, 9, 11, &stream };
-
-    fmt::print("{}", error(here, "something\nvery\nlong", { "funny", "thing" }));
+    (void)argv;
 }
