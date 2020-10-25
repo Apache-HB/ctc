@@ -69,11 +69,21 @@ std::vector<std::string> split(std::string str, std::string tok) {
     return out;
 }
 
-std::string underline(
-    Where it, 
-    const std::string& msg = "",
-    const std::vector<std::string>& notes = {}
+struct Error {
+    std::string msg;
+    Where where;
+    std::vector<std::string> notes;
+};
+
+std::string error(
+    const std::vector<Error>& errors
 ) {
+    int len = 0;
+
+    for (auto err : errors) {
+        len = std::max(len, fmt::format("{}", err.where.line).length());
+    }
+#if 0
     auto in = it.source;
     std::string out = fmt::format("{} -> [{}:{}]\n", in->name, it.line, it.col);
 
@@ -106,4 +116,5 @@ std::string underline(
     }
 
     return out;
+#endif
 }

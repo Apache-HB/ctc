@@ -16,5 +16,5 @@ int main(int argc, char** argv) {
 
     Where here = { 9, 1, 9, 11, &stream };
 
-    fmt::print("{}", underline(here, "something\nvery\nlong", { "funny", "thing" }));
+    fmt::print("{}", error(here, "something\nvery\nlong", { "funny", "thing" }));
 }
