@@ -2,6 +2,6 @@
 #   define KEY(id, str)
 #endif
 
-KEY(def, "def")
+KEY(K_VAR, "var")
 
 #undef KEY

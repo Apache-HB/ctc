@@ -1,128 +1,86 @@
-#pragma once
+#ifndef CTHULHU_H
+#define CTHULHU_H 
 
-#include <variant>
-#include <string>
-#include <fmt/core.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-struct Where {
-    int dist = 0;
-    int line = 0;
-    int col = 0;
-    int len = 0;
-};
+typedef struct {
+    /* owns */
+    char *ptr;
+    size_t len;
+    size_t size;
+} CtBuffer;
 
-struct Stream {
-    Stream(void* in, int(*func)(void*), std::string id);
+CtBuffer ctBufferAlloc(size_t init);
+void ctBufferFree(CtBuffer self);
 
-    // get the next character from the file
-    // and then move to the next character
-    int next();
+void ctPush(CtBuffer *self, char c);
+void ctAppend(CtBuffer *self, const char *str, size_t len);
 
-    // get the next character without
-    // moving forward in the stream
-    int peek();
+typedef struct {
+    size_t offset;
+    size_t line;
+    size_t col;
+} CtWhere;
 
-    // check if the next char is c
-    // and if it is get the next character
-    bool eat(char c);
+typedef struct {
+    size_t offset;
+    size_t line;
+    size_t col;
+    size_t len;
+} CtRange;
 
-    // native file stream
-    void* stream;
-    // native function to get next char
-    // should return 0 at EOF
-    int(*get)(void*);
-    // filename
-    std::string name;
+typedef struct {
+    /* doesnt own */
+    void *stream;
+    char(*get)(void*);
 
-    // lookahead char
-    int ahead;
-    // current location
-    Where pos;
-    // files read contents
-    std::string buffer;
-};
+    /* owns */
+    char ahead;
+    CtBuffer buffer;
+    CtWhere where;
+} CtStream;
 
-struct Token { Where where; };
+CtStream ctStreamAlloc(void *stream, char(*fun)(void*));
+void ctStreamFree(CtStream self);
 
-struct Ident : Token, std::string { 
-    using Super = std::string;
-    Ident(Super str)
-        : Super(str)
-    { }
-};
-struct String : Token, std::string { };
+char ctNext(CtStream *self);
+char ctPeek(CtStream *self);
+bool ctEat(CtStream *self, char c);
+CtWhere ctHere(CtStream *self);
 
-struct Key : Token {
-    enum { 
+typedef enum {
+    TK_INVALID, TK_END,
+    TK_IDENT, TK_STRING,
+    TK_INT, TK_KEY
+} CtTokenKind;
+
+typedef enum {
 #define KEY(id, str) id,
-#include "keys.inc"
-    } key;
+#include "keys.h"
+    K_INVALID
+} CtKey;
 
-    Key(decltype(key) k)
-        : key(k)
-    { }
-};
+typedef uint64_t CtInt;
 
-using key_t = decltype(Key::invalid);
+typedef union {
+    CtKey key;
+    CtInt num;
+} CtTokenData;
 
-struct End : Token { };
-struct Invalid : Token { };
+typedef struct {
+    CtTokenKind kind;
+    CtRange where;
+    CtTokenData data;
+} CtToken;
 
-struct Lex : Stream {
-    Token* get();
+typedef struct {
+    /* doesnt own */
+    CtStream *source;
+} CtLex;
 
-    Token* ident(char c);
-};
+CtLex ctLexAlloc(CtStream *source);
+void ctLexFree(CtLex self);
 
-// errors are formatted like
-// file.ct -> [line:col] [line:col]
-//        * error message
-//        |
-//  line1 | line content
-//        | ^~~~ error 
-//        | ...
-// line20 | more content here
-//        |      ^~~~~~~ message
-//        * note1
-//        * note2
-#if 0
-std::string error(const std::vector<Error>& errors) {
-    int len = 0;
-    for (auto err : errors) {
-        len = std::max(len, fmt::format("{}", err.where.line).length());
-    }
-
-    auto in = it.source;
-    std::string out = fmt::format("{} -> [{}:{}]\n", in->name, it.line, it.col);
-
-    auto len = fmt::format(" {} ", it.line).length();
-
-    auto begin = std::max(it.dist - it.col, 0);
-    auto end = in->buffer.find_first_of("\n\0", it.dist);
-
-    auto line = in->buffer.substr(begin, end);
-
-    out += std::string(len, ' ') + "|\n";
-    out += fmt::format(" {} | ", it.line) + line + "\n";
-    auto under = std::string(len, ' ') + "| " + std::string(it.col, ' ') + '^' + std::string(it.len - 1, '~');
-    out += under;
-
-    if (msg.length() > 0) {
-        bool once = true;
-        for (auto part : split(msg, "\n")) {
-            if (once) {
-                once = false;
-                out += " " + part + '\n';
-            } else {
-                out += std::string(under.length() + 1, ' ') + part + '\n';
-            }
-        }
-    }
-
-    for (auto note : notes) {
-        out += std::string(len, ' ') + "* " + note + '\n';
-    }
-
-    return out;
-}
-#endif
+#endif /* CTHULHU_H */

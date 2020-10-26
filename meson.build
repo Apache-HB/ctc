@@ -1,15 +1,13 @@
-project('cthulhu', 'cpp',
+project('cthulhu', 'c',
     default_options : [
-        'cpp_std=c++17',
-        'cpp_rtti=false',
-        'cpp_eh=none',
+        'c_std=c99',
         'werror=true',
         'warning_level=3'
     ]
 )
 
-fmt = subproject('fmt').get_variable('fmt_dep')
-
-cthulhu = executable('cthulhu', 'cthulhu/cthulhu.cpp',
-    dependencies : fmt
+ct_dep = declare_dependency(
+    include_directories : include_directories('.')
 )
+
+test('compile', executable('compile', 'tests/compile.c', dependencies : ct_dep))
