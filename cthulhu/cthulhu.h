@@ -42,24 +42,36 @@ struct Stream {
     std::string buffer;
 };
 
-struct Token {
-    Where where;
-};
+struct Token { Where where; };
 
-struct Ident : Token {
-    std::string id;
+struct Ident : Token, std::string { 
+    using Super = std::string;
+    Ident(Super str)
+        : Super(str)
+    { }
 };
+struct String : Token, std::string { };
 
 struct Key : Token {
-    enum { invalid } key;
+    enum { 
+#define KEY(id, str) id,
+#include "keys.inc"
+    } key;
+
+    Key(decltype(key) k)
+        : key(k)
+    { }
 };
+
+using key_t = decltype(Key::invalid);
 
 struct End : Token { };
 struct Invalid : Token { };
 
-
 struct Lex : Stream {
     Token* get();
+
+    Token* ident(char c);
 };
 
 // errors are formatted like
