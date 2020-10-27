@@ -229,6 +229,29 @@ static void lexIdent(CtLex *self, char c, CtToken *tok) {
     tok->kind = TK_IDENT;
 }
 
+void lexDigit(CtLex *self, char c, CtToken *tok) {
+
+}
+
+CtKey lexKey(CtLex *self, char c) {
+    switch (c) {
+    case '(': return K_LPAREN;
+    case ')': return K_RPAREN;
+    case ';': return K_SEMI;
+    default: return K_INVALID;
+    }
+}
+
+void lexSymbol(CtLex *self, char c, CtToken *tok) {
+    CtKey key = lexKey(self, c);
+    if (key == K_INVALID) {
+        tok->kind = TK_INVALID;
+    } else {
+        tok->kind = TK_KEY;
+        tok->data.key = key;
+    }
+}
+
 CtToken ctLexNext(CtLex *self) {
     char c = ctNext(self->source);
     CtToken tok = { TK_INVALID };
@@ -239,9 +262,9 @@ CtToken ctLexNext(CtLex *self) {
     } else if (isident1(c)) {
         lexIdent(self, c, &tok);
     } else if (isdigit(c)) {
-
+        lexDigit(self, c, &tok);
     } else {
-
+        lexSymbol(self, c, &tok);
     }
 
 

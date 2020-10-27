@@ -64,6 +64,7 @@ typedef enum {
 
 typedef enum {
 #define KEY(id, str) id,
+#define OP(id, str) id,
 #include "keys.h"
     K_INVALID
 } CtKey;
