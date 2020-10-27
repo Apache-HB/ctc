@@ -1,17 +1,11 @@
 #include <stdlib.h>
 
-#define CT_MALLOC malloc
-#define CT_FREE free
-#define CT_REALLOC realloc
-
-#define CT_MM_SMALL
-
 #include "cthulhu/cthulhu.c"
 
+
+/* simple sanity check to make sure stuff compiles */
 int main(int argc, char **argv) {
-    (void)argc;
-    (void)argv;
-    CtBuffer buffer = ctBufferAlloc(0x100);
-    ctBufferFree(buffer);
+    CT_UNUSED(argc);
+    CT_UNUSED(argv);
     return 0;
 }

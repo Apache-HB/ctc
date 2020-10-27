@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* allocate and free global objects */
+void ctInit();
+void ctFree();
+
 typedef struct {
     /* owns */
     char *ptr;
@@ -17,6 +21,8 @@ void ctBufferFree(CtBuffer self);
 
 void ctPush(CtBuffer *self, char c);
 void ctAppend(CtBuffer *self, const char *str, size_t len);
+size_t ctOffset(CtBuffer *self);
+const char *ctAt(CtBuffer *self, size_t off);
 
 typedef struct {
     size_t offset;
@@ -62,11 +68,9 @@ typedef enum {
     K_INVALID
 } CtKey;
 
-typedef uint64_t CtInt;
-
 typedef union {
     CtKey key;
-    CtInt num;
+    /* CtToken::where ident; */
 } CtTokenData;
 
 typedef struct {
@@ -78,9 +82,15 @@ typedef struct {
 typedef struct {
     /* doesnt own */
     CtStream *source;
+
+#ifdef CT_MM_FAST
+    /* owns */
+    CtBuffer buf;
+#endif
 } CtLex;
 
 CtLex ctLexAlloc(CtStream *source);
 void ctLexFree(CtLex self);
+CtToken ctLexNext(CtLex *self);
 
 #endif /* CTHULHU_H */
