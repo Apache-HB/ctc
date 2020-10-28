@@ -23,6 +23,7 @@ void ctPush(CtBuffer *self, char c);
 void ctAppend(CtBuffer *self, const char *str, size_t len);
 size_t ctOffset(CtBuffer *self);
 const char *ctAt(CtBuffer *self, size_t off);
+void ctRewind(CtBuffer *self, size_t off);
 
 typedef struct {
     size_t offset;

@@ -91,6 +91,10 @@ const char *ctAt(CtBuffer *self, size_t off) {
     return self->ptr + off;
 }
 
+void ctRewind(CtBuffer *self, size_t off) {
+    self->len = off;
+}
+
 CtStream ctStreamAlloc(void *stream, char(*fun)(void*)) {
     CtStream self = {
         .stream = stream,
@@ -182,6 +186,11 @@ static size_t lexEnd(CtLex *self) {
     return offset;
 }
 
+static void lexRewind(CtLex *self, size_t offset) {
+    CT_UNUSED(self);
+    ctRewind(LEXBUF(self), offset);
+} 
+
 static CtRange newRange(CtWhere where) {
     CtRange self = {
         .offset = where.offset,
@@ -220,6 +229,8 @@ static void lexIdent(CtLex *self, char c, CtToken *tok) {
 
     for (size_t i = 0; i < sizeof(keys) / sizeof(KeyPair); i++) {
         if (strncmp(keys[i].str, ctAt(LEXBUF(self), start), len + 1) == 0) {
+            /* no need to save keywords in the buffer */
+            lexRewind(self, start);
             tok->kind = TK_KEY;
             tok->data.key = keys[i].id;
             return;
@@ -230,14 +241,21 @@ static void lexIdent(CtLex *self, char c, CtToken *tok) {
 }
 
 void lexDigit(CtLex *self, char c, CtToken *tok) {
-
+    CT_UNUSED(self);
+    CT_UNUSED(c);
+    CT_UNUSED(tok);
 }
 
 CtKey lexKey(CtLex *self, char c) {
     switch (c) {
     case '(': return K_LPAREN;
     case ')': return K_RPAREN;
+    case '[': return K_LSQUARE;
+    case ']': return K_RSQUARE;
+    case '{': return K_LBRACE;
+    case '}': return K_RBRACE;
     case ';': return K_SEMI;
+    case '!': return ctEat(self->source, '=') ? K_NEQ : K_NOT;
     default: return K_INVALID;
     }
 }
