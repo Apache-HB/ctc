@@ -29,12 +29,6 @@ typedef struct {
     size_t offset;
     size_t line;
     size_t col;
-} CtWhere;
-
-typedef struct {
-    size_t offset;
-    size_t line;
-    size_t col;
     size_t len;
 } CtRange;
 
@@ -46,7 +40,7 @@ typedef struct {
     /* owns */
     char ahead;
     CtBuffer buffer;
-    CtWhere where;
+    CtRange where;
 } CtStream;
 
 CtStream ctStreamAlloc(void *stream, char(*fun)(void*));
@@ -55,7 +49,7 @@ void ctStreamFree(CtStream self);
 char ctNext(CtStream *self);
 char ctPeek(CtStream *self);
 bool ctEat(CtStream *self, char c);
-CtWhere ctHere(CtStream *self);
+CtRange ctHere(CtStream *self);
 
 typedef enum {
     TK_INVALID, TK_END,

@@ -35,6 +35,20 @@
 
 #ifdef CT_MM_SMALL
 static CtBuffer lexbuf;
+bool lexlock = false;
+#endif
+
+#ifdef CT_MM_SMALL
+#   define LEXLOCK(fun) { while (lexlock) {} lexlock = true; { fun } lexlock = false; }
+#else
+#   define LEXLOCK(fun) fun
+#endif
+
+#ifdef CT_MM_SMALL
+    /* the (lex - lex) thing is to stop compilers complaining about unused arguments */
+#   define LEXBUF(lex) (&lexbuf + (lex - lex))
+#else
+#   define LEXBUF(lex) (&lex->buf)
 #endif
 
 void ctInit() {
@@ -49,12 +63,16 @@ void ctFree() {
 #endif
 }
 
-#ifdef CT_MM_SMALL
-#   define LEXBUF(lex) (&lexbuf)
-#else
-#   define LEXBUF(lex) (&lex->buf)
-#endif
+static CtRange zeroRange() {
+    CtRange self;
 
+    self.offset = 0;
+    self.line = 0;
+    self.col = 0;
+    self.len = 0;
+
+    return self;
+}
 
 void ctPush(CtBuffer *self, char c) {
     if (self->len + 1 >= self->size) {
@@ -70,11 +88,11 @@ void ctPush(CtBuffer *self, char c) {
 }
 
 CtBuffer ctBufferAlloc(size_t init) {
-    CtBuffer self = {
-        .ptr = CT_MALLOC(init),
-        .size = init,
-        .len = 0
-    };
+    CtBuffer self;
+
+    self.ptr = CT_MALLOC(init);
+    self.size = init;
+    self.len = 0;
 
     return self;
 }
@@ -96,13 +114,13 @@ void ctRewind(CtBuffer *self, size_t off) {
 }
 
 CtStream ctStreamAlloc(void *stream, char(*fun)(void*)) {
-    CtStream self = {
-        .stream = stream,
-        .get = fun,
-        .ahead = fun(stream),
-        .buffer = ctBufferAlloc(CT_MM_INIT_SIZE),
-        .where = { 0, 0, 0 }
-    };
+    CtStream self;
+
+    self.stream = stream;
+    self.get = fun;
+    self.ahead = fun(stream);
+    self.buffer = ctBufferAlloc(CT_MM_INIT_SIZE);
+    self.where = zeroRange();
 
     return self;
 }
@@ -139,7 +157,7 @@ bool ctEat(CtStream *self, char c) {
     return false;
 }
 
-CtWhere ctHere(CtStream *self) {
+CtRange ctHere(CtStream *self) {
     return self->where;
 }
 
@@ -148,9 +166,8 @@ static size_t sourceOffset(CtStream *self) {
 }
 
 CtLex ctLexAlloc(CtStream *source) {
-    CtLex lex = {
-        .source = source
-    };
+    CtLex lex;
+    lex.source = source;
 
 #ifdef CT_MM_FAST
     lex.buf = ctBufferAlloc(CT_MM_INIT_SIZE);
@@ -160,8 +177,7 @@ CtLex ctLexAlloc(CtStream *source) {
 }
 
 void ctLexFree(CtLex self) {
-    (void)self;
-
+    CT_UNUSED(self);
 #ifdef CT_MM_FAST
     ctBufferFree(self.buf);
 #endif
@@ -169,38 +185,38 @@ void ctLexFree(CtLex self) {
 
 /* returns the offset of the buffer */
 static size_t lexBegin(CtLex *self) {
-    CT_UNUSED(self);
-    return ctOffset(LEXBUF(self));
+    size_t offset;
+
+    LEXLOCK({
+        offset = ctOffset(LEXBUF(self));
+    })
+
+    return offset;
 }
 
 static void lexPush(CtLex *self, char c) {
-    CT_UNUSED(self);
-    ctPush(LEXBUF(self), c);
+    LEXLOCK({
+        ctPush(LEXBUF(self), c);
+    })
 }
 
 /* returns the end of the string and null terminates it */
 static size_t lexEnd(CtLex *self) {
-    CT_UNUSED(self);
-    size_t offset = ctOffset(LEXBUF(self));
-    ctPush(LEXBUF(self), 0);
+    size_t offset;
+    
+    LEXLOCK({
+        offset = ctOffset(LEXBUF(self));
+        ctPush(LEXBUF(self), 0);
+    })
+
     return offset;
 }
 
 static void lexRewind(CtLex *self, size_t offset) {
-    CT_UNUSED(self);
-    ctRewind(LEXBUF(self), offset);
+    LEXLOCK({
+        ctRewind(LEXBUF(self), offset);
+    })
 } 
-
-static CtRange newRange(CtWhere where) {
-    CtRange self = {
-        .offset = where.offset,
-        .line = where.line,
-        .col = where.col,
-        .len = 0
-    };
-
-    return self;
-}
 
 static bool isident1(char c) { return isalpha(c) || c == '_'; }
 static bool isident2(char c) { return isalnum(c) || c == '_'; }
@@ -214,9 +230,12 @@ KeyPair keys[] = {
 };
 
 static void lexIdent(CtLex *self, char c, CtToken *tok) {
-    size_t start = lexBegin(self);
+    size_t start;
     size_t end;
     size_t len;
+    size_t i;
+
+    start = lexBegin(self);
 
     lexPush(self, c);
 
@@ -227,7 +246,7 @@ static void lexIdent(CtLex *self, char c, CtToken *tok) {
     end = lexEnd(self);
     len = end - start;
 
-    for (size_t i = 0; i < sizeof(keys) / sizeof(KeyPair); i++) {
+    for (i = 0; i < sizeof(keys) / sizeof(KeyPair); i++) {
         if (strncmp(keys[i].str, ctAt(LEXBUF(self), start), len + 1) == 0) {
             /* no need to save keywords in the buffer */
             lexRewind(self, start);
@@ -271,9 +290,13 @@ void lexSymbol(CtLex *self, char c, CtToken *tok) {
 }
 
 CtToken ctLexNext(CtLex *self) {
-    char c = ctNext(self->source);
-    CtToken tok = { TK_INVALID };
-    CtRange here = newRange(ctHere(self->source));
+    char c;
+    CtToken tok;
+    CtRange here;
+    
+    tok.kind = TK_INVALID;
+    c = ctNext(self->source);
+    here = ctHere(self->source);
 
     if (c == 0) {
         tok.kind = TK_END;
