@@ -2,7 +2,7 @@ project('ct', 'java')
 
 src = [
     'com/cthulhu/Token.java',
-    'com/cthulhu/Main.java',
+    'com/cthulhu/Lexer.java',
 
     'com/cthulhu/tokens/EOFToken.java',
     'com/cthulhu/tokens/InvalidToken.java',
@@ -12,7 +12,9 @@ src = [
     'com/cthulhu/tokens/IntToken.java'
 ]
 
-out = jar('cthulhuc', src, 
-    main_class : 'com.cthulhu.Main'
-)
-test('run', out)
+out = jar('cthulhuc', src + ['com/cthulhu/Main.java'])
+
+test('lex1', jar('lex1', 'com/tests/Lex1.java', 
+    main_class : 'com.tests.Lex1',
+    link_with : out
+))

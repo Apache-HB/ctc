@@ -4,7 +4,7 @@ import com.cthulhu.Token;
 
 public class IdentToken implements Token {
     String id;
-    IdentToken(String i) {
+    public IdentToken(String i) {
         id = i;
     }
 }

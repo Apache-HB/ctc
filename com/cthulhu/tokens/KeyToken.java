@@ -12,7 +12,7 @@ public enum KeyToken implements Token {
     NOT,
     NEQ;
 
-    static Map<String, KeyToken> keys = Map.ofEntries(
+    public static Map<String, KeyToken> keys = Map.ofEntries(
         entry("def", DEF),
         entry("struct", STRUCT)
     );
