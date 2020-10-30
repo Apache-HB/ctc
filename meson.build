@@ -1,13 +1,18 @@
-project('cthulhu', 'c',
-    default_options : [
-        'c_std=c89',
-        'werror=true',
-        'warning_level=3'
-    ]
-)
+project('ct', 'java')
 
-ct_dep = declare_dependency(
-    include_directories : include_directories('.')
-)
+src = [
+    'com/cthulhu/Token.java',
+    'com/cthulhu/Main.java',
 
-subdir('tests')
+    'com/cthulhu/tokens/EOFToken.java',
+    'com/cthulhu/tokens/InvalidToken.java',
+    'com/cthulhu/tokens/IdentToken.java',
+    'com/cthulhu/tokens/KeyToken.java',
+    'com/cthulhu/tokens/StringToken.java',
+    'com/cthulhu/tokens/IntToken.java'
+]
+
+out = jar('cthulhuc', src, 
+    main_class : 'com.cthulhu.Main'
+)
+test('run', out)
