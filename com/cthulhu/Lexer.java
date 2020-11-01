@@ -81,8 +81,8 @@ public class Lexer {
     Token ident(char c) {
         String buf = collect(c, Lexer::isIdent2);
 
-        if (KeyToken.keys.containsKey(buf)) {
-            return KeyToken.keys.get(buf);
+        if (Key.keys.containsKey(buf)) {
+            return Key.keys.get(buf);
         } else {
             return new IdentToken(buf);
         }
@@ -106,7 +106,7 @@ public class Lexer {
         } else if (Character.isDigit(peek())) {
             return base(get(), 10, Character::isDigit);
         } else {
-            return new IntToken(0);
+            return new IntToken("0", 10);
         }
     }
 
@@ -122,10 +122,11 @@ public class Lexer {
     }
 
     Token symbol(char c) {
-        return switch (c) {
-            case '!' -> eat('=') ? KeyToken.NEQ : KeyToken.NOT;
-            default -> null;
-        };
+        return (switch (c) {
+            case '!' -> (eat('=') ? Key.NEQ : Key.NOT).tok();
+            case '=' -> eat('=') ? Key.keys.get(Key.EQ) : new InvalidToken("=");
+            default -> new InvalidToken(Character.toString(c));
+        });
     }
 
     public Token next() {
